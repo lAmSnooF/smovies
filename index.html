@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="theme-color" content="#141414">
+    <meta name="description" content="SMovies — stream movies and TV shows.">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SMovies">
+    <title>SMovies</title>
+    <link rel="preconnect" href="https://api.themoviedb.org">
+    <link rel="preconnect" href="https://image.tmdb.org">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=7">
+</head>
+<body>
+
+    <!-- ===== PROFILE SELECTION SCREEN ===== -->
+    <div id="profile-screen" class="screen active">
+        <div class="profile-gate">
+            <a href="#" class="logo profile-logo">SMovies</a>
+            <h1 class="profile-gate-title">Who's watching?</h1>
+            <div id="profile-list" class="profile-list"></div>
+            <button id="manage-profiles-btn" class="manage-profiles-btn">Manage Profiles</button>
+        </div>
+    </div>
+
+    <!-- ===== PROFILE MANAGEMENT SCREEN ===== -->
+    <div id="profile-manage-screen" class="screen">
+        <div class="profile-gate">
+            <a href="#" class="logo profile-logo">SMovies</a>
+            <h1 class="profile-gate-title">Manage Profiles</h1>
+            <div id="profile-manage-list" class="profile-list"></div>
+            <button id="done-manage-btn" class="manage-profiles-btn white-btn">Done</button>
+        </div>
+    </div>
+
+    <!-- ===== EDIT PROFILE SCREEN ===== -->
+    <div id="profile-edit-screen" class="screen">
+        <div class="profile-edit-container">
+            <h1>Edit Profile</h1>
+            <div class="profile-edit-form">
+                <div class="profile-edit-avatar-section">
+                    <div id="edit-avatar-preview" class="profile-avatar large"></div>
+                    <div class="avatar-picker" id="avatar-picker"></div>
+                </div>
+                <div class="profile-edit-fields">
+                    <input type="text" id="edit-profile-name" placeholder="Name" maxlength="20">
+                    <label class="kids-toggle">
+                        <input type="checkbox" id="edit-kids-toggle">
+                        <span class="kids-label">Kids Profile</span>
+                        <span class="kids-desc">Only shows content rated for children.</span>
+                    </label>
+                </div>
+            </div>
+            <div class="profile-edit-actions">
+                <button id="save-profile-btn" class="white-btn">Save</button>
+                <button id="cancel-edit-btn" class="ghost-btn">Cancel</button>
+                <button id="delete-profile-btn" class="delete-btn">Delete Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ADD PROFILE SCREEN ===== -->
+    <div id="profile-add-screen" class="screen">
+        <div class="profile-edit-container">
+            <h1>Add Profile</h1>
+            <p class="add-profile-subtitle">Add a profile for another person watching SMovies.</p>
+            <div class="profile-edit-form">
+                <div class="profile-edit-avatar-section">
+                    <div id="add-avatar-preview" class="profile-avatar large"></div>
+                    <div class="avatar-picker" id="add-avatar-picker"></div>
+                </div>
+                <div class="profile-edit-fields">
+                    <input type="text" id="add-profile-name" placeholder="Name" maxlength="20">
+                    <label class="kids-toggle">
+                        <input type="checkbox" id="add-kids-toggle">
+                        <span class="kids-label">Kids Profile</span>
+                        <span class="kids-desc">Only shows content rated for children.</span>
+                    </label>
+                </div>
+            </div>
+            <div class="profile-edit-actions">
+                <button id="create-profile-btn" class="white-btn">Continue</button>
+                <button id="cancel-add-btn" class="ghost-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TASTE PICKER SCREEN (Pick 5 Movies) ===== -->
+    <div id="taste-picker-screen" class="screen">
+        <div class="taste-picker-container">
+            <h1>Welcome to SMovies!</h1>
+            <p class="taste-subtitle">Pick <strong>5 titles</strong> you like so we can personalize your experience.</p>
+            <div class="taste-search-bar">
+                <input type="text" id="taste-search-input" placeholder="Search for a movie or show...">
+            </div>
+            <div class="taste-counter"><span id="taste-count">0</span> / 5 selected</div>
+            <div id="taste-grid" class="taste-grid"></div>
+            <div class="taste-selected-bar" id="taste-selected-bar"></div>
+            <button id="taste-done-btn" class="white-btn taste-done-btn" disabled>Done</button>
+        </div>
+    </div>
+
+    <!-- ===== MAIN HOME SCREEN ===== -->
+    <div id="home-screen" class="screen">
+        <nav id="main-nav">
+            <a href="#" class="logo">SMovies</a>
+            <div class="nav-links">
+                <a href="#" data-page="home" class="nav-link active">Home</a>
+                <a href="#" data-page="tv" class="nav-link">TV Shows</a>
+                <a href="#" data-page="movies" class="nav-link">Movies</a>
+                <a href="#" data-page="mylist" class="nav-link">My List</a>
+            </div>
+            <div class="nav-right">
+                <button id="mobile-search-btn" class="icon-btn" aria-label="Search">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"></path></svg>
+                </button>
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Search...">
+                    <div id="search-results-list"></div>
+                </div>
+                <div class="player-selector-container">
+                    <button id="player-selector-btn" aria-label="Choose player">
+                        <svg class="server-icon" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M4 1h16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V3a2 2 0 012-2zm0 12h16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6a2 2 0 012-2zm2 3v2h2v-2H6zm0-12v2h2V4H6z"></path></svg>
+                        <span id="current-player-name">Videasy</span>
+                        <svg class="dropdown-arrow" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"></path></svg>
+                    </button>
+                    <div class="player-menu" id="player-menu">
+                        <div class="menu-header">Choose Player</div>
+                        <ul>
+                            <li data-api="videasy">
+                                <span>Videasy</span>
+                                <span class="checkmark">✔</span>
+                            </li>
+                            <li data-api="vidking">
+                                <span>VidKing</span>
+                                <span class="checkmark" style="display: none;">✔</span>
+                            </li>
+                            <li data-api="vidsrc">
+                                <span>VidSrc</span>
+                                <span class="checkmark" style="display: none;">✔</span>
+                            </li>
+                            <li data-api="anyembed">
+                                <span>Anyembed</span>
+                                <span class="checkmark" style="display: none;">✔</span>
+                            </li>
+                            <li data-api="vidlink">
+                                <span>VidLink</span>
+                                <span class="checkmark" style="display: none;">✔</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="profile-menu-container">
+                    <button id="profile-menu-btn" class="profile-menu-btn">
+                        <div id="nav-profile-avatar" class="profile-avatar small"></div>
+                        <svg class="dropdown-arrow" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"></path></svg>
+                    </button>
+                    <div class="profile-dropdown" id="profile-dropdown">
+                        <div id="profile-dropdown-list"></div>
+                        <div class="profile-dropdown-divider"></div>
+                        <a href="#" id="nav-manage-profiles" class="profile-dropdown-link">Manage Profiles</a>
+                        <a href="#" id="nav-switch-profile" class="profile-dropdown-link">Switch Profile</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <header class="hero" id="hero-section">
+            <div id="hero-video-container"></div>
+            <div class="hero-details">
+                <h1 id="hero-title" class="hero-title"></h1>
+                <p id="hero-overview" class="hero-overview"></p>
+                <div class="hero-buttons">
+                    <button id="hero-play-btn">
+                        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M8 5v14l11-7z"></path></svg>
+                        <span>Play</span>
+                    </button>
+                    <button id="hero-info-btn">
+                        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
+                        <span>More Info</span>
+                    </button>
+                    <button id="hero-add-btn" class="hero-list-btn" title="Add to My List">
+                        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="hero-right-meta">
+                <button id="hero-mute-btn"></button>
+                <span id="hero-age-rating"></span>
+            </div>
+        </header>
+
+        <!-- My List Page (hidden by default) -->
+        <div id="mylist-page" class="mylist-page" style="display: none;">
+            <h1 class="mylist-title">My List</h1>
+            <div id="mylist-grid" class="mylist-grid"></div>
+            <div id="mylist-empty" class="mylist-empty" style="display:none;">
+                <svg viewBox="0 0 24 24" width="80" height="80"><path fill="#555" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                <h2>Your list is empty</h2>
+                <p>Add movies and TV shows to keep track of what you want to watch.</p>
+            </div>
+        </div>
+
+        <main id="content-rows" class="content-rows">
+            <div id="continue-watching-section" class="category-row" style="display: none;">
+                <div class="category-header"><h2 class="category-title">Continue Watching</h2></div>
+                <div class="slider">
+                    <button class="slider-arrow prev hidden">&#8249;</button>
+                    <div id="continue-watching-display" class="posters-container"></div>
+                    <button class="slider-arrow next">&#8250;</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- ===== MOBILE BOTTOM NAVIGATION ===== -->
+        <nav id="mobile-nav">
+            <a href="#" data-page="home" class="mobile-nav-item active">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path></svg>
+                <span>Home</span>
+            </a>
+            <a href="#" data-page="tv" class="mobile-nav-item">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"></path></svg>
+                <span>TV Shows</span>
+            </a>
+            <a href="#" data-page="movies" class="mobile-nav-item">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"></path></svg>
+                <span>Movies</span>
+            </a>
+            <a href="#" data-page="mylist" class="mobile-nav-item">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                <span>My List</span>
+            </a>
+            <a href="#" id="mobile-nav-search" class="mobile-nav-item">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"></path></svg>
+                <span>Search</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- ===== MOBILE SEARCH OVERLAY ===== -->
+    <div id="search-overlay" class="search-overlay">
+        <div class="search-overlay-bar">
+            <button id="search-overlay-back" class="icon-btn" aria-label="Close search">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"></path></svg>
+            </button>
+            <input type="text" id="search-overlay-input" placeholder="Search movies & shows..." autocomplete="off">
+            <button id="search-overlay-clear" class="icon-btn" aria-label="Clear">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+            </button>
+        </div>
+        <div id="search-overlay-results" class="search-overlay-results"></div>
+    </div>
+
+    <div id="player-screen" class="screen">
+        <button id="back-to-home-btn">&larr; Back</button>
+        <div id="player-preview"></div>
+    </div>
+
+    <div id="details-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <div class="modal-scroll-content">
+                <div class="modal-media-section">
+                    <div id="modal-backdrop"></div>
+                    <div class="media-overlay-gradient"></div>
+                    <div id="modal-title-logo-container"></div>
+                    <div class="modal-action-buttons">
+                        <button id="modal-play-btn">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"></path></svg>
+                            <span>Play</span>
+                        </button>
+                        <button class="action-icon-btn" id="modal-add-btn" title="Add to My List">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                        </button>
+                        <button class="action-icon-btn" id="modal-like-btn" title="Like">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"></path></svg>
+                        </button>
+                    </div>
+                    <button class="action-icon-btn" id="modal-mute-btn" title="Mute/Unmute"></button>
+                </div>
+
+                <div class="modal-details-container">
+                    <div class="modal-meta-grid">
+                        <div class="meta-left-col">
+                            <div class="meta-tags-bar">
+                                <span id="modal-year"></span>
+                                <span id="modal-seasons" style="display:none;"></span>
+                                <span class="quality-tag">HD</span>
+                            </div>
+                            <div class="meta-age-and-overview">
+                                <span id="modal-age-rating"></span>
+                                <p id="modal-overview"></p>
+                            </div>
+                        </div>
+                        <div class="meta-right-col">
+                            <p class="credit-list"><span>Cast:</span> <span id="modal-cast"></span></p>
+                            <p class="credit-list"><span>Genres:</span> <span id="modal-genres"></span></p>
+                            <p class="credit-list"><span>This show is:</span> <span id="modal-keywords"></span></p>
+                        </div>
+                    </div>
+
+                    <div id="episodes-section" class="episodes-section" style="display: none;">
+                        <div class="episodes-header">
+                            <h2>Episodes</h2>
+                            <select id="season-selector"></select>
+                        </div>
+                        <ul id="episode-list"></ul>
+                    </div>
+
+                    <div id="recommendations-section">
+                        <h2>More Like This</h2>
+                        <div id="modal-recommendations-grid" class="grid-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=7"></script>
+</body>
+</html>
