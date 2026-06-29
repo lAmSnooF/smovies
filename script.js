@@ -1713,15 +1713,7 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     // NOTE: These players actively detect the iframe `sandbox` attribute and refuse to
     // run ("Iframe Sandbox Detected"), so we cannot block their popups/redirects in-page.
     // Ad-blocking has to be done at the browser level (uBlock Origin / Brave / AdGuard DNS).
-
-    // On iOS, the native fullscreen button hands the video to Apple's system player, and
-    // when the user exits it the embed never learns it left fullscreen — so every tap
-    // re-triggers native fullscreen until you toggle the in-player button again. Dropping
-    // `allowfullscreen` makes Videasy fall back to its own in-page fullscreen, which fills
-    // our already full-viewport player screen and keeps its fullscreen state consistent.
-    const allowFs = !(isIOS() && currentPlayerAPI === 'videasy');
-    const fsAttrs = allowFs ? 'allowfullscreen allow="autoplay; encrypted-media; fullscreen"' : 'allow="autoplay; encrypted-media"';
-    playerPreview.innerHTML = `<iframe src="${embedUrl}" ${fsAttrs}></iframe>`;
+    playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>`;
 };
 
 
