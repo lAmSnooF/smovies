@@ -29,6 +29,9 @@ const KIDS_AVATARS = [
 // --- DEVICE / VIEWPORT HELPERS ---
 const canHover = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches && window.innerWidth > 1024;
 const isMobile = () => window.innerWidth <= 740;
+// iOS/iPadOS (including iPads that report as "MacIntel" but have a touch screen).
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const num = (v) => { const n = Number(v); return isFinite(n) ? n : 0; };
 
 // Pick the best official title-logo image (Netflix-style art) from a TMDB images object.
@@ -313,6 +316,9 @@ let addAvatarIndex = 0;
 let editAvatarIndex = 0;
 let tasteSelections = [];
 let currentPage = 'home';
+// Bumped on every page load; async work checks it so a slow request from a page the
+// user already navigated away from can't overwrite the current page's hero/rows.
+let pageLoadToken = 0;
 
 // --- SVG Icons ---
 const volumeUpIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>`;
@@ -381,16 +387,28 @@ const KIDS_CONTENT_CONFIG = {
 
 
 // --- Helper Functions ---
-const apiFetch = async (endpoint, params = '') => {
+// In-memory cache so re-visiting a page (or re-requesting the same title) is instant
+// instead of re-hitting the network. We cache the in-flight promise so parallel
+// callers share one request, and we never cache failures (so they can be retried).
+const apiCache = new Map();
+const apiFetch = (endpoint, params = '') => {
     const url = `${API_BASE_URL}${endpoint}?api_key=${TMDB_API_KEY}${params}`;
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Network response was not ok');
-        return await response.json();
-    } catch (error) {
-        console.error(`Error fetching from ${endpoint}:`, error);
-        return { results: [] };
-    }
+    if (apiCache.has(url)) return apiCache.get(url);
+
+    const promise = (async () => {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network response was not ok');
+            return await response.json();
+        } catch (error) {
+            console.error(`Error fetching from ${endpoint}:`, error);
+            apiCache.delete(url); // allow a future retry
+            return { results: [] };
+        }
+    })();
+
+    apiCache.set(url, promise);
+    return promise;
 };
 
 // --- LEGACY HISTORY (used by "For You" / "Because You Watched" genre analysis) ---
@@ -1039,10 +1057,11 @@ function setupSlider(sliderElement) {
     handleScroll();
 }
 
-const createCategoryRow = (title, endpoint) => {
+const createCategoryRow = (title, endpoint, params = '') => {
     const row = document.createElement('div');
     row.className = 'category-row';
     row.dataset.endpoint = endpoint;
+    row.dataset.params = params;
     row.innerHTML = `<div class="category-header"><h2 class="category-title">${title}</h2></div>`;
 
     const slider = document.createElement('div');
@@ -1061,7 +1080,7 @@ const populateRow = async (row) => {
     const endpoint = row.dataset.endpoint;
     if (!endpoint || row.dataset.loaded) return;
     row.dataset.loaded = 'true';
-    const { results } = await apiFetch(endpoint);
+    const { results } = await apiFetch(endpoint, row.dataset.params || '');
     const postersContainer = row.querySelector('.posters-container');
     results.forEach(item => {
         const cardWrapper = createPosterCard(item);
@@ -1235,45 +1254,57 @@ const createBecauseYouWatchedRow = async (lastWatchedItem) => {
 };
 
 
-const updateHero = async (page) => {
+const setHeroBackground = (item) => {
+    if (isMobile()) {
+        // Bottom-up fade so the centered logo + buttons stay legible.
+        heroSection.style.backgroundImage = `linear-gradient(to top, #141414 0%, rgba(20,20,20,0.6) 30%, rgba(20,20,20,0) 65%), url(${IMAGE_BASE_URL}w780${item.backdrop_path})`;
+    } else {
+        heroSection.style.backgroundImage = `linear-gradient(to right, rgba(20,20,20,1) 0%, rgba(20,20,20,0) 50%), url(${IMAGE_BASE_URL}original${item.backdrop_path})`;
+    }
+};
+
+const updateHero = async (page, token) => {
     const profile = getActiveProfile();
     const isKids = profile && profile.isKids;
     const config = isKids ? (KIDS_CONTENT_CONFIG[page] || CONTENT_CONFIG[page]) : CONTENT_CONFIG[page];
     if (!config) return;
     const heroCategory = config.find(cat => cat.endpoint);
     if (!heroCategory) return;
+
     const { results } = await apiFetch(heroCategory.endpoint, heroCategory.params || '');
+    if (token !== pageLoadToken) return; // user navigated away — abandon
     const heroData = results.find(item => item.backdrop_path);
-    if (heroData) {
-        const mediaType = heroData.media_type || (heroData.title ? 'movie' : 'tv');
-        const details = await apiFetch(`/${mediaType}/${heroData.id}`, '&append_to_response=content_ratings,images&include_image_language=en,null');
-        currentHeroItem = { ...heroData, ...details };
+    if (!heroData) return;
 
-        stopHeroTrailer();
-        if (isMobile()) {
-            // Bottom-up fade so the centered logo + buttons stay legible.
-            heroSection.style.backgroundImage = `linear-gradient(to top, #141414 0%, rgba(20,20,20,0.6) 30%, rgba(20,20,20,0) 65%), url(${IMAGE_BASE_URL}w780${currentHeroItem.backdrop_path})`;
-        } else {
-            heroSection.style.backgroundImage = `linear-gradient(to right, rgba(20,20,20,1) 0%, rgba(20,20,20,0) 50%), url(${IMAGE_BASE_URL}original${currentHeroItem.backdrop_path})`;
-        }
+    const mediaType = heroData.media_type || (heroData.title ? 'movie' : 'tv');
 
-        const logo = currentHeroItem.images?.logos?.find(l => l.iso_639_1 === 'en');
-        if (logo) {
-            heroTitle.innerHTML = `<img src="${IMAGE_BASE_URL}w500${logo.file_path}" alt="${currentHeroItem.title || currentHeroItem.name}" class="hero-title-logo">`;
-        } else {
-            heroTitle.textContent = currentHeroItem.title || currentHeroItem.name;
-        }
-
-        heroOverview.textContent = currentHeroItem.overview;
-        heroAgeRating.textContent = currentHeroItem.content_ratings?.results?.find(r => r.iso_3166_1 === 'US')?.rating || '';
-        heroPlayBtn.onclick = () => loadMedia(currentHeroItem);
-        heroInfoBtn.onclick = () => openDetailsModal(currentHeroItem);
-        heroAddBtn.onclick = () => {
-            toggleMyList(currentHeroItem);
-            updateHeroAddBtn();
-        };
+    // Paint the banner + basic info right away from the list data we already have,
+    // so the hero appears after one request instead of waiting on the details call.
+    currentHeroItem = { ...heroData };
+    stopHeroTrailer();
+    setHeroBackground(heroData);
+    heroTitle.textContent = heroData.title || heroData.name || '';
+    heroOverview.textContent = heroData.overview || '';
+    heroAgeRating.textContent = '';
+    heroPlayBtn.onclick = () => loadMedia(currentHeroItem);
+    heroInfoBtn.onclick = () => openDetailsModal(currentHeroItem);
+    heroAddBtn.onclick = () => {
+        toggleMyList(currentHeroItem);
         updateHeroAddBtn();
+    };
+    updateHeroAddBtn();
+
+    // Then enrich with the official title-logo art and age rating.
+    const details = await apiFetch(`/${mediaType}/${heroData.id}`, '&append_to_response=content_ratings,images&include_image_language=en,null');
+    if (token !== pageLoadToken) return; // stale by the time details arrived
+    currentHeroItem = { ...heroData, ...details };
+
+    const logo = currentHeroItem.images?.logos?.find(l => l.iso_639_1 === 'en');
+    if (logo) {
+        heroTitle.innerHTML = `<img src="${IMAGE_BASE_URL}w500${logo.file_path}" alt="${currentHeroItem.title || currentHeroItem.name}" class="hero-title-logo">`;
     }
+    heroAgeRating.textContent = currentHeroItem.content_ratings?.results?.find(r => r.iso_3166_1 === 'US')?.rating || '';
+    updateHeroAddBtn();
 };
 
 const updateMuteButtonIcon = () => {
@@ -1323,6 +1354,7 @@ const stopHeroTrailer = () => {
 // --- loadPageContent ---
 const loadPageContent = async (page) => {
     currentPage = page;
+    const token = ++pageLoadToken;
     contentRows.innerHTML = '';
 
     // Handle My List page
@@ -1343,6 +1375,14 @@ const loadPageContent = async (page) => {
     const isKids = profile && profile.isKids;
     const config = isKids ? (KIDS_CONTENT_CONFIG[page] || CONTENT_CONFIG[page]) : CONTENT_CONFIG[page];
 
+    // Kick the hero off immediately (it's the most visible element) so it isn't
+    // blocked behind the rows or the personalized-row requests below.
+    updateHero(page, token);
+
+    // Marker that personalized rows (loaded asynchronously) get inserted before,
+    // so they keep their place near the top even though they resolve later.
+    const personalizedAnchor = document.createComment('personalized-rows');
+
     if (page === 'home') {
         contentRows.appendChild(continueWatchingSection);
         renderContinueWatching();
@@ -1360,17 +1400,8 @@ const loadPageContent = async (page) => {
             contentRows.appendChild(myListRow);
         }
 
-        const history = getHistory();
-        if (history.length > 0) {
-            const forYouRow = await createForYouRow(history);
-            if (forYouRow) contentRows.appendChild(forYouRow);
-
-            const becauseRow = await createBecauseYouWatchedRow(history[0]);
-            if (becauseRow) contentRows.appendChild(becauseRow);
-        }
+        contentRows.appendChild(personalizedAnchor);
     }
-
-    await updateHero(page);
 
     config.forEach(cat => {
         let row;
@@ -1379,11 +1410,29 @@ const loadPageContent = async (page) => {
             contentRows.appendChild(row);
             populateTabbedRow(row, cat.config.tabs[0], cat.config.type);
         } else if (cat.endpoint) {
-            row = createCategoryRow(cat.title, cat.endpoint + (cat.params || ''));
+            row = createCategoryRow(cat.title, cat.endpoint, cat.params || '');
             contentRows.appendChild(row);
             rowObserver.observe(row);
         }
     });
+
+    // Personalized rows make several sequential requests, so build them in the
+    // background and slot them in above the main rows once ready.
+    if (page === 'home') {
+        const history = getHistory();
+        if (history.length > 0) {
+            (async () => {
+                const forYouRow = await createForYouRow(history);
+                if (token === pageLoadToken && forYouRow && personalizedAnchor.parentNode) {
+                    contentRows.insertBefore(forYouRow, personalizedAnchor);
+                }
+                const becauseRow = await createBecauseYouWatchedRow(history[0]);
+                if (token === pageLoadToken && becauseRow && personalizedAnchor.parentNode) {
+                    contentRows.insertBefore(becauseRow, personalizedAnchor);
+                }
+            })();
+        }
+    }
 };
 
 // --- NETFLIX-STYLE DETAILS MODAL & EPISODES LOGIC ---
@@ -1664,7 +1713,15 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     // NOTE: These players actively detect the iframe `sandbox` attribute and refuse to
     // run ("Iframe Sandbox Detected"), so we cannot block their popups/redirects in-page.
     // Ad-blocking has to be done at the browser level (uBlock Origin / Brave / AdGuard DNS).
-    playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>`;
+
+    // On iOS, the native fullscreen button hands the video to Apple's system player, and
+    // when the user exits it the embed never learns it left fullscreen — so every tap
+    // re-triggers native fullscreen until you toggle the in-player button again. Dropping
+    // `allowfullscreen` makes Videasy fall back to its own in-page fullscreen, which fills
+    // our already full-viewport player screen and keeps its fullscreen state consistent.
+    const allowFs = !(isIOS() && currentPlayerAPI === 'videasy');
+    const fsAttrs = allowFs ? 'allowfullscreen allow="autoplay; encrypted-media; fullscreen"' : 'allow="autoplay; encrypted-media"';
+    playerPreview.innerHTML = `<iframe src="${embedUrl}" ${fsAttrs}></iframe>`;
 };
 
 
