@@ -1179,11 +1179,12 @@ nav .search-container:focus-within > svg { color: #fff; }
 .slider-arrow.next:hover { background: linear-gradient(to left, rgba(8,8,8,0.98), rgba(8,8,8,0.15)); }
 .slider-arrow.hidden { opacity: 0; pointer-events: none; }
 
+/* Raise the hovered row's stacking context so its popup draws above the next row.
+   No transform here on purpose: the popup is a child of this row, and animating the
+   row's transform at the same time as the popup's own scale makes the popup stutter. */
 .category-row.lifted {
     position: relative;
     z-index: 200;
-    transform: translateY(-20px);
-    transition: transform 0.3s ease;
 }
 
 .poster-card-wrapper {
@@ -1359,19 +1360,20 @@ nav .search-container:focus-within > svg { color: #fff; }
     width: 420px;
     max-width: 90vw;
     opacity: 0;
-    transform: scale(0.92) translateY(12px);
-    transform-origin: center bottom;
+    transform: scale(0.95);
+    transform-origin: center center;
     /* Promote to its own GPU layer so the scale/opacity animation composites smoothly
-       instead of repainting the backdrop art on every frame. */
+       instead of repainting the backdrop art on every frame. A pure scale (no translate)
+       keeps it from fighting the row's own motion. */
     will-change: transform, opacity;
     backface-visibility: hidden;
-    transition: transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
-                opacity 0.22s ease-out;
+    transition: transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 0.18s ease-out;
 }
 .hover-popup.active {
     display: block;
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: scale(1);
     pointer-events: auto;
 }
 .popup-media-container {

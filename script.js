@@ -1004,7 +1004,8 @@ const positionAndShowPopup = async (cardWrapper, item) => {
         popup.addEventListener('mouseleave', () => hoverLeaveTimeout = setTimeout(() => clearPopup(false), 300));
     }
 
-    popup.style.display = 'block';
+    // NOTE: intentionally do NOT display the popup yet — it stays hidden through the
+    // fetch/content/position prep below and is only shown in reveal() once fully built.
 
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
     let details = detailsCache.get(item.id);
@@ -1074,13 +1075,15 @@ const positionAndShowPopup = async (cardWrapper, item) => {
     popup.style.top = `${top}px`;
 
     // Reveal only once the banner art has decoded, so it doesn't stutter / pop in
-    // mid-animation. rAF ensures the starting transform is committed before we flip to
-    // .active (otherwise the browser can skip the transition). Falls back after 350ms so
-    // a slow image never leaves the popup stuck hidden.
+    // mid-animation. The popup stays display:none through all the prep above (fetch,
+    // content, positioning) so nothing half-built is ever on screen; we show it and then,
+    // one committed frame later, flip to .active so the scale/opacity transition actually
+    // runs. Falls back after 350ms so a slow image never leaves it stuck hidden.
     let revealed = false;
     const reveal = () => {
         if (revealed) return;
         revealed = true;
+        popup.style.display = 'block';
         requestAnimationFrame(() => requestAnimationFrame(() => popup.classList.add('active')));
     };
     if (bannerUrl) {
