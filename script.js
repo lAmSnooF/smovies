@@ -4,6 +4,39 @@ const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/';
 const ACCENT_HEX = 'e50914';
 
+// Build a clean, chrome-free YouTube embed URL for background trailers (hero + details modal).
+// The goal is video only — no control bar, no captions, no fullscreen/keyboard UI, no
+// end-screen suggestions or annotations — so it reads as ambient art rather than a player.
+//   controls=0        hide the play/scrub control bar
+//   cc_load_policy=0  don't force closed captions / subtitles on
+//   fs=0              remove the fullscreen button
+//   disablekb=1       ignore keyboard shortcuts
+//   iv_load_policy=3  hide video annotations
+//   modestbranding=1  drop the large YouTube logo
+//   rel=0             keep related videos limited to the same channel
+//   playsinline=1     don't hijack into native fullscreen on mobile Safari
+//   loop=1&playlist=  loop the single video back to the start
+function buildTrailerEmbedUrl(key, muteState) {
+    const origin = encodeURIComponent(window.location.origin);
+    const params = [
+        'autoplay=1',
+        `mute=${muteState}`,
+        'controls=0',
+        'cc_load_policy=0',
+        'fs=0',
+        'disablekb=1',
+        'iv_load_policy=3',
+        'modestbranding=1',
+        'rel=0',
+        'playsinline=1',
+        'loop=1',
+        `playlist=${key}`,
+        'enablejsapi=1',
+        `origin=${origin}`,
+    ].join('&');
+    return `${YOUTUBE_EMBED_URL}${key}?${params}`;
+}
+
 // --- PROFILE AVATARS ---
 const AVATAR_COLORS = [
     { bg: '#e50914', icon: '😎' },
@@ -1332,8 +1365,7 @@ const playHeroTrailerAfterDelay = () => {
             const trailer = results.find(vid => vid.site === 'YouTube' && (vid.type === 'Trailer' || vid.type === 'Teaser'));
             if (trailer) {
                 const muteState = isHeroMuted ? 1 : 0;
-                const origin = encodeURIComponent(window.location.origin);
-                heroVideoContainer.innerHTML = `<iframe src="${YOUTUBE_EMBED_URL}${trailer.key}?autoplay=1&mute=${muteState}&controls=0&loop=1&playlist=${trailer.key}&rel=0&enablejsapi=1&origin=${origin}&iv_load_policy=3&modestbranding=1" allow="autoplay; encrypted-media" frameborder="0"></iframe>`;
+                heroVideoContainer.innerHTML = `<iframe src="${buildTrailerEmbedUrl(trailer.key, muteState)}" allow="autoplay; encrypted-media" frameborder="0"></iframe>`;
                 heroVideoContainer.classList.add('visible');
                 updateMuteButtonIcon();
                 heroMuteBtn.style.display = 'flex';
@@ -1549,8 +1581,7 @@ const openDetailsModal = async (item) => {
     isModalMuted = isMobile();
     if (trailer) {
         const muteState = isModalMuted ? 1 : 0;
-        const origin = encodeURIComponent(window.location.origin);
-        modalBackdrop.innerHTML = `<iframe src="${YOUTUBE_EMBED_URL}${trailer.key}?autoplay=1&mute=${muteState}&controls=0&loop=1&playlist=${trailer.key}&rel=0&enablejsapi=1&origin=${origin}&iv_load_policy=3&modestbranding=1&playsinline=1" allow="autoplay; encrypted-media" frameborder="0"></iframe>`;
+        modalBackdrop.innerHTML = `<iframe src="${buildTrailerEmbedUrl(trailer.key, muteState)}" allow="autoplay; encrypted-media" frameborder="0"></iframe>`;
         updateModalMuteButton();
         document.getElementById('modal-mute-btn').style.display = 'flex';
     } else {
@@ -1713,7 +1744,14 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     // NOTE: These players actively detect the iframe `sandbox` attribute and refuse to
     // run ("Iframe Sandbox Detected"), so we cannot block their popups/redirects in-page.
     // Ad-blocking has to be done at the browser level (uBlock Origin / Brave / AdGuard DNS).
-    playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>`;
+
+    // The players render the real <video> inside a NESTED cross-origin iframe. A bare
+    // `allow="fullscreen"` only grants the feature to the player's own origin (the default
+    // 'src' allowlist), so the nested stream frame is denied and the fullscreen button does
+    // nothing on desktop. The `*` allowlist propagates fullscreen/autoplay/etc. down the
+    // whole frame chain so the actual video element can enter fullscreen. We also add the
+    // legacy webkit/moz boolean attributes for older engines.
+    playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen webkitallowfullscreen mozallowfullscreen allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *"></iframe>`;
 };
 
 
