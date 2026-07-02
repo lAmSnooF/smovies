@@ -1,0 +1,46 @@
+name: Deploy static site to Pages
+
+on:
+  # Deploy on every push to main. No `paths:` filter on purpose: this repo is a
+  # flat static site (index.html/script.js/style.css at the root), so filtering
+  # to src/** or public/** would silently stop deploys from ever triggering.
+  push:
+    branches: [main]
+  # Lets you re-run a deploy by hand from the Actions tab ("Run workflow").
+  workflow_dispatch:
+
+# Permissions the official deploy-pages action needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deploy at a time; cancel an older queued/running one so stale
+# runs can't pile up and clog the Pages deploy queue (what caused the
+# `deployment_queued` timeouts on the classic branch build).
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Whole repo root is the site (no build step).
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
