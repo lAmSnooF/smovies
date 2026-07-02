@@ -1,4 +1,4 @@
-# SMovies
+# SFLIX
 
 A Netflix-style movie & TV streaming front-end built with vanilla HTML, CSS, and JavaScript. It uses the [TMDB API](https://www.themoviedb.org/) for metadata and embeds third-party players for playback.
 
@@ -8,7 +8,7 @@ A Netflix-style movie & TV streaming front-end built with vanilla HTML, CSS, and
 - Multiple **profiles** (including Kids profiles), avatars, and a first-run taste picker
 - **My List** and **Continue Watching** with real watch-progress tracking and resume
 - Search and genre/network browsing
-- Switchable players — Videasy, VidKing, VidSrc, Anyembed, VidLink
+- Embedded Videasy player for playback
 - Fully **responsive** — works on desktop and mobile (bottom nav, full-screen search, mobile hero)
 - All user data (profiles, list, progress) is saved locally in the browser via `localStorage`
 

@@ -1,5 +1,5 @@
 /* ===================================================================
-   SMovies — Stylesheet
+   SFLIX — Stylesheet
    Desktop design preserved; full responsive/mobile layer added below.
    =================================================================== */
 
@@ -82,7 +82,7 @@ body, html {
     text-decoration: none;
 }
 
-/* ===== PNG BRAND LOGO (replaces the SMovies wordmark) ===== */
+/* ===== PNG BRAND LOGO ===== */
 .logo { display: inline-flex; align-items: center; }
 .logo img { display: block; width: auto; }
 nav#main-nav .logo img { height: 48px; }
