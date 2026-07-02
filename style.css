@@ -863,10 +863,12 @@ nav .search-container {
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
-.hero-buttons button:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.45); }
-.hero-buttons button:active { transform: translateY(0); }
+/* Hover feedback is shadow-only, never a transform: the hero scrolls under a
+   stationary cursor, so a translate would toggle on/off every frame and make
+   the buttons visibly shake while scrolling. */
+.hero-buttons button:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
 #hero-play-btn { background-color: #fff; color: #000; }
 #hero-play-btn:hover { background-color: rgba(255,255,255,0.85); }
 #hero-info-btn { background-color: rgba(109, 109, 110, 0.7); color: #fff; }
@@ -1182,13 +1184,13 @@ nav .search-container {
     object-fit: cover;
     background: #222;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    transition: box-shadow 0.3s ease;
 }
-/* Gentle lift before the full hover-popup takes over (desktop pointers only) */
+/* Deepen the shadow on hover (desktop pointers only). No transform lift — a
+   positional shift would jitter as the row scrolls under a stationary cursor. */
 @media (hover: hover) and (pointer: fine) {
     .poster-card-wrapper:hover > img {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.65);
     }
 }
 
@@ -1549,12 +1551,11 @@ nav .search-container {
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
     background-color: #fff;
     color: #000;
 }
-#modal-play-btn:hover { background-color: rgba(255,255,255,0.85); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
-#modal-play-btn:active { transform: translateY(0); }
+#modal-play-btn:hover { background-color: rgba(255,255,255,0.85); box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
 #modal-play-btn svg { width: 24px; height: 24px; }
 
 .action-icon-btn {
@@ -1568,13 +1569,12 @@ nav .search-container {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
     flex-shrink: 0;
 }
 .action-icon-btn:hover {
     border-color: #fff;
-    background-color: rgba(255,255,255,0.1);
-    transform: scale(1.1);
+    background-color: rgba(255,255,255,0.15);
 }
 .action-icon-btn.in-list {
     border-color: var(--accent-green);
