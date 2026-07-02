@@ -81,6 +81,13 @@ body, html {
     text-transform: uppercase;
     text-decoration: none;
 }
+
+/* ===== PNG BRAND LOGO (replaces the SMovies wordmark) ===== */
+.logo { display: inline-flex; align-items: center; }
+.logo img { display: block; width: auto; }
+nav#main-nav .logo img { height: 40px; }
+.profile-logo img { height: 56px; }
+.taste-logo img { height: 52px; }
 .profile-gate-title {
     font-size: clamp(2em, 3.4vw, 3.2em);
     font-weight: 700;
