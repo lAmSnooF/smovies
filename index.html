@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 
@@ -96,15 +96,23 @@
 
     <!-- ===== TASTE PICKER SCREEN (Pick 5 Movies) ===== -->
     <div id="taste-picker-screen" class="screen">
+        <a href="#" class="logo taste-logo">SMovies</a>
         <div class="taste-picker-container">
-            <h1>Welcome to SMovies!</h1>
-            <p class="taste-subtitle">Pick <strong>5 titles</strong> you like so we can personalize your experience.</p>
+            <div class="taste-head">
+                <h1 class="taste-title">Pick what you love</h1>
+                <p class="taste-subtitle">Choose <strong>5 titles</strong> and we'll tailor your homepage.</p>
+            </div>
             <div class="taste-search-bar">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"></path></svg>
                 <input type="text" id="taste-search-input" placeholder="Search for a movie or show...">
             </div>
-            <div class="taste-counter"><span id="taste-count">0</span> / 5 selected</div>
             <div id="taste-grid" class="taste-grid"></div>
-            <div class="taste-selected-bar" id="taste-selected-bar"></div>
+        </div>
+        <div class="taste-footer">
+            <div class="taste-progress">
+                <div class="taste-progress-dots" id="taste-progress-dots"></div>
+                <span class="taste-progress-label"><span id="taste-count">0</span> of 5 selected</span>
+            </div>
             <button id="taste-done-btn" class="white-btn taste-done-btn" disabled>Done</button>
         </div>
     </div>
@@ -325,6 +333,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=11"></script>
+    <script src="script.js?v=12"></script>
 </body>
 </html>

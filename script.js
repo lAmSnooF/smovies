@@ -63,25 +63,10 @@ window.addEventListener('message', (e) => {
 });
 
 // --- PROFILE AVATARS ---
-const AVATAR_COLORS = [
-    { bg: '#e50914', icon: '😎' },
-    { bg: '#0080ff', icon: '🦊' },
-    { bg: '#e87c03', icon: '🐱' },
-    { bg: '#b9090b', icon: '🎬' },
-    { bg: '#46d369', icon: '🌿' },
-    { bg: '#6b3fa0', icon: '👾' },
-    { bg: '#f5c518', icon: '⭐' },
-    { bg: '#ff6b9d', icon: '🦄' },
-    { bg: '#00c8ff', icon: '🐬' },
-    { bg: '#ff4500', icon: '🔥' },
-];
-
-const KIDS_AVATARS = [
-    { bg: '#46d369', icon: '🧸' },
-    { bg: '#f5c518', icon: '🌟' },
-    { bg: '#ff6b9d', icon: '🦋' },
-    { bg: '#00c8ff', icon: '🐠' },
-    { bg: '#e87c03', icon: '🦁' },
+// Netflix-style square avatar images in /images, used for every profile (adult + kids).
+const AVATARS = [
+    'images/1.jfif', 'images/2.jfif', 'images/3.jfif', 'images/4.jfif', 'images/5.jfif',
+    'images/6.jfif', 'images/7.jfif', 'images/8.jfif', 'images/9.jfif',
 ];
 
 // --- DEVICE / VIEWPORT HELPERS ---
@@ -91,6 +76,12 @@ const isMobile = () => window.innerWidth <= 740;
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const num = (v) => { const n = Number(v); return isFinite(n) ? n : 0; };
+
+// Genres that count as kids-friendly: Animation (16), Family (10751), Kids/TV (10762).
+// Used to keep kids profiles from seeing adult titles in search + the taste picker.
+const KIDS_GENRE_IDS = [16, 10751, 10762];
+const isKidsSafe = (item) => !item.adult && Array.isArray(item.genre_ids)
+    && item.genre_ids.some(g => KIDS_GENRE_IDS.includes(g));
 
 // Pick the best official title-logo image (Netflix-style art) from a TMDB images object.
 // Prefers English, then language-neutral, then anything; prefers PNG and more-voted logos.
@@ -574,11 +565,12 @@ const showPlayerScreen = () => {
 
 // --- PROFILE AVATAR RENDERING ---
 function renderProfileAvatar(el, avatarIndex, isKids) {
-    const avatars = isKids ? KIDS_AVATARS : AVATAR_COLORS;
-    const idx = avatarIndex % avatars.length;
-    const avatar = avatars[idx];
-    el.style.backgroundColor = avatar.bg;
-    el.textContent = avatar.icon;
+    const idx = ((num(avatarIndex) % AVATARS.length) + AVATARS.length) % AVATARS.length;
+    el.style.backgroundImage = `url('${AVATARS[idx]}')`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.backgroundColor = 'transparent';
+    el.textContent = '';
 }
 
 // --- PROFILE SELECTION SCREEN ---
@@ -726,12 +718,10 @@ function openEditProfile(profileId) {
 function renderAvatarPicker(containerId, isKids, selectedIdx, onClick) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
-    const avatars = isKids ? KIDS_AVATARS : AVATAR_COLORS;
-    avatars.forEach((av, idx) => {
+    AVATARS.forEach((src, idx) => {
         const el = document.createElement('div');
         el.className = 'avatar-option' + (idx === selectedIdx ? ' selected' : '');
-        el.style.backgroundColor = av.bg;
-        el.textContent = av.icon;
+        el.style.backgroundImage = `url('${src}')`;
         el.addEventListener('click', () => onClick(idx));
         container.appendChild(el);
     });
@@ -748,7 +738,7 @@ function rerenderAddAvatarPicker() {
 }
 
 function openAddProfile() {
-    addAvatarIndex = Math.floor(Math.random() * AVATAR_COLORS.length);
+    addAvatarIndex = Math.floor(Math.random() * AVATARS.length);
     document.getElementById('add-profile-name').value = '';
     document.getElementById('add-kids-toggle').checked = false;
     rerenderAddAvatarPicker();
@@ -758,10 +748,8 @@ function openAddProfile() {
 // --- TASTE PICKER ---
 function openTastePicker(profileId) {
     tasteSelections = [];
-    document.getElementById('taste-count').textContent = '0';
-    document.getElementById('taste-done-btn').disabled = true;
     document.getElementById('taste-search-input').value = '';
-    document.getElementById('taste-selected-bar').innerHTML = '';
+    renderTasteProgress();
     showScreen(tastePickerScreen);
     loadTasteGrid();
 }
@@ -769,10 +757,22 @@ function openTastePicker(profileId) {
 async function loadTasteGrid(query) {
     const grid = document.getElementById('taste-grid');
     grid.innerHTML = '<div class="taste-loading">Loading...</div>';
+    const profile = getActiveProfile();
+    const isKids = !!(profile && profile.isKids);
     let results;
     if (query && query.length > 1) {
         const data = await apiFetch('/search/multi', `&query=${encodeURIComponent(query)}`);
-        results = data.results.filter(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path).slice(0, 20);
+        results = data.results.filter(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path);
+        if (isKids) results = results.filter(isKidsSafe); // kids profile: family/animation only
+        results = results.slice(0, 20);
+    } else if (isKids) {
+        // Kids profile: seed the grid with family / animation / kids titles only.
+        const [m, t] = await Promise.all([
+            apiFetch('/discover/movie', '&with_genres=16,10751&sort_by=popularity.desc'),
+            apiFetch('/discover/tv', '&with_genres=16,10762&sort_by=popularity.desc'),
+        ]);
+        results = [...m.results, ...t.results].filter(r => r.poster_path).sort(() => 0.5 - Math.random()).slice(0, 20);
+        results.forEach(r => { if (!r.media_type) r.media_type = r.title ? 'movie' : 'tv'; });
     } else {
         const data = await apiFetch('/movie/popular');
         const data2 = await apiFetch('/tv/popular');
@@ -803,20 +803,24 @@ function toggleTasteSelection(item, card) {
         tasteSelections.push({ id: item.id, title: item.title || item.name, media_type: item.media_type || 'movie' });
         card.classList.add('selected');
     }
-    document.getElementById('taste-count').textContent = tasteSelections.length;
-    document.getElementById('taste-done-btn').disabled = tasteSelections.length < 5;
-    renderTasteSelectedBar();
+    renderTasteProgress();
 }
 
-function renderTasteSelectedBar() {
-    const bar = document.getElementById('taste-selected-bar');
-    bar.innerHTML = '';
-    tasteSelections.forEach(s => {
-        const chip = document.createElement('span');
-        chip.className = 'taste-chip';
-        chip.textContent = s.title;
-        bar.appendChild(chip);
-    });
+// Reflect the current selection count in the sticky footer: fill the 5 dots,
+// update the label, and enable Done only once 5 are chosen.
+function renderTasteProgress() {
+    const n = tasteSelections.length;
+    document.getElementById('taste-count').textContent = n;
+    document.getElementById('taste-done-btn').disabled = n < 5;
+    const dots = document.getElementById('taste-progress-dots');
+    if (dots) {
+        dots.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+            const dot = document.createElement('span');
+            dot.className = 'taste-dot' + (i < n ? ' filled' : '');
+            dots.appendChild(dot);
+        }
+    }
 }
 
 // --- MY LIST PAGE ---
@@ -1835,7 +1839,11 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
 // --- Search Logic ---
 async function fetchSearchResults(query) {
     const { results } = await apiFetch(`/search/multi`, `&query=${encodeURIComponent(query)}`);
-    return (results || []).filter(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path);
+    let list = (results || []).filter(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path);
+    // Kids profiles only ever see family / animation / kids titles in search.
+    const profile = getActiveProfile();
+    if (profile && profile.isKids) list = list.filter(isKidsSafe);
+    return list;
 }
 
 const handleSearch = (event) => {
@@ -2034,8 +2042,6 @@ document.getElementById('delete-profile-btn').addEventListener('click', () => {
 
 // Edit kids toggle
 document.getElementById('edit-kids-toggle').addEventListener('change', () => {
-    const isKids = document.getElementById('edit-kids-toggle').checked;
-    if (isKids && editAvatarIndex >= KIDS_AVATARS.length) editAvatarIndex = 0;
     rerenderEditAvatarPicker();
 });
 
@@ -2065,8 +2071,6 @@ document.getElementById('cancel-add-btn').addEventListener('click', () => {
 
 // Add kids toggle
 document.getElementById('add-kids-toggle').addEventListener('change', () => {
-    const isKids = document.getElementById('add-kids-toggle').checked;
-    if (isKids && addAvatarIndex >= KIDS_AVATARS.length) addAvatarIndex = 0;
     rerenderAddAvatarPicker();
 });
 
