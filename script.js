@@ -482,22 +482,29 @@ const createContinueCard = (item) => {
     if (!img) return null;
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'poster-card-wrapper';
+    wrapper.className = 'poster-card-wrapper continue-wrapper';
     const pct = Math.max(2, Math.min(100, item.percent || 0));
     const titleText = item.title || item.name || '';
-    const label = (item.mediaType === 'tv' && item.season != null && item.episode != null)
-        ? `${titleText} · S${item.season}:E${item.episode}` : titleText;
+    const isTv = item.mediaType === 'tv' && item.season != null && item.episode != null;
+    const epText = isTv ? `S${item.season} · E${item.episode}` : '';
 
     wrapper.innerHTML = `
         <div class="continue-card">
             <img src="${img}" alt="${titleText}">
+            <div class="continue-card-gradient"></div>
+            <div class="card-logo"></div>
+            <span class="continue-label">${titleText}</span>
+            ${epText ? `<span class="continue-ep">${epText}</span>` : ''}
             <div class="continue-card-overlay">
                 <button class="continue-play-btn" aria-label="Resume">${playIconSvg}</button>
             </div>
             <button class="continue-remove-btn" title="Remove from Continue Watching">✕</button>
-            <span class="continue-label">${label}</span>
             <div class="continue-progress-track"><div class="continue-progress-fill" style="width:${pct}%"></div></div>
         </div>`;
+
+    // Lazy-load the official title-logo art onto the banner, like the other rows.
+    wrapper._item = { ...item, media_type: item.mediaType || item.media_type || (item.title ? 'movie' : 'tv') };
+    cardLogoObserver.observe(wrapper);
 
     const resume = (e) => {
         if (e) e.stopPropagation();
@@ -904,6 +911,21 @@ const clearPopup = (instant = false) => {
     document.querySelectorAll('.category-row.lifted').forEach(el => el.classList.remove('lifted'));
 };
 
+// --- Suppress hover-popups while the user is actively scrolling ---
+// When you scroll, cards slide under a stationary cursor and fire mouseenter, which would
+// otherwise pop a preview open. Flag scrolling (reset shortly after it stops), cancel any
+// pending popup, and hide any open one. Capturing + passive so it catches page and row
+// scrolls without affecting scroll performance.
+let isScrolling = false;
+let scrollStopTimer;
+document.addEventListener('scroll', () => {
+    isScrolling = true;
+    clearTimeout(hoverEnterTimeout);
+    clearPopup(true);
+    clearTimeout(scrollStopTimer);
+    scrollStopTimer = setTimeout(() => { isScrolling = false; }, 180);
+}, { capture: true, passive: true });
+
 
 // --- Lazy "small banner" title-logo overlay for row cards ---
 const logoCache = new Map(); // tmdbId -> logo object | null (each title fetched once)
@@ -973,8 +995,9 @@ const createPosterCard = (item, usePoster = false) => {
     });
 
     // Hover preview is desktop-only; touch devices tap straight through to the modal.
+    // Skip while scrolling — cards passing under a still cursor shouldn't trigger a preview.
     cardWrapper.addEventListener('mouseenter', () => {
-        if (!canHover()) return;
+        if (!canHover() || isScrolling) return;
         clearTimeout(hoverLeaveTimeout);
         hoverEnterTimeout = setTimeout(() => {
             positionAndShowPopup(cardWrapper, item);
@@ -990,7 +1013,7 @@ const createPosterCard = (item, usePoster = false) => {
 };
 
 const positionAndShowPopup = async (cardWrapper, item) => {
-    if (!canHover()) return;
+    if (!canHover() || isScrolling) return;
     clearPopup(true);
 
     const row = cardWrapper.closest('.category-row');
