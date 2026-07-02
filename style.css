@@ -1336,9 +1336,14 @@ nav .search-container {
     width: 420px;
     max-width: 90vw;
     opacity: 0;
-    transform: scale(0.9) translateY(20px);
-    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
-                opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transform: scale(0.92) translateY(12px);
+    transform-origin: center bottom;
+    /* Promote to its own GPU layer so the scale/opacity animation composites smoothly
+       instead of repainting the backdrop art on every frame. */
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    transition: transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 0.22s ease-out;
 }
 .hover-popup.active {
     display: block;

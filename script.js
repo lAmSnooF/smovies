@@ -15,7 +15,10 @@ const ACCENT_HEX = 'e50914';
 //   modestbranding=1  drop the large YouTube logo
 //   rel=0             keep related videos limited to the same channel
 //   playsinline=1     don't hijack into native fullscreen on mobile Safari
-//   loop=1&playlist=  loop the single video back to the start
+// NOTE: we deliberately DON'T use loop=1&playlist=KEY — that makes YouTube treat it as a
+// playlist and forces the prev/next (⏮ ⏭) nav buttons on screen even with controls=0.
+// Instead we loop by listening for the "ended" event and seeking back to 0 (see
+// mountTrailerLoop below), which keeps the frame completely chrome-free.
 function buildTrailerEmbedUrl(key, muteState) {
     const origin = encodeURIComponent(window.location.origin);
     const params = [
@@ -29,13 +32,35 @@ function buildTrailerEmbedUrl(key, muteState) {
         'modestbranding=1',
         'rel=0',
         'playsinline=1',
-        'loop=1',
-        `playlist=${key}`,
         'enablejsapi=1',
         `origin=${origin}`,
     ].join('&');
     return `${YOUTUBE_EMBED_URL}${key}?${params}`;
 }
+
+// Loop a chrome-free trailer without the playlist nav buttons: once the iframe loads we
+// tell the YouTube player to start posting events, and when it reports "ended" (state 0)
+// we seek back to the start and replay. One global listener handles every trailer iframe.
+function mountTrailerLoop(iframe) {
+    if (!iframe) return;
+    const ping = () => { try { iframe.contentWindow.postMessage('{"event":"listening"}', '*'); } catch (e) {} };
+    iframe.addEventListener('load', () => { ping(); setTimeout(ping, 400); setTimeout(ping, 1200); });
+}
+
+window.addEventListener('message', (e) => {
+    if (typeof e.data !== 'string' || e.origin.indexOf('youtube') === -1 || !e.source) return;
+    let d;
+    try { d = JSON.parse(e.data); } catch (_) { return; }
+    const state = d.info && typeof d.info.playerState === 'number'
+        ? d.info.playerState
+        : (d.event === 'onStateChange' ? d.info : undefined);
+    if (state === 0) { // ENDED → loop back to the start
+        try {
+            e.source.postMessage('{"event":"command","func":"seekTo","args":[0,true]}', '*');
+            e.source.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
+        } catch (_) {}
+    }
+});
 
 // --- PROFILE AVATARS ---
 const AVATAR_COLORS = [
@@ -359,6 +384,8 @@ const volumeOffIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16
 const plusIcon = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>`;
 const checkIcon = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"></path></svg>`;
 const playIconSvg = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"></path></svg>`;
+const likeIcon = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"></path></svg>`;
+const infoIcon = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>`;
 const prevArrowIcon = `&#8249;`;
 const nextArrowIcon = `&#8250;`;
 
@@ -1006,10 +1033,10 @@ const positionAndShowPopup = async (cardWrapper, item) => {
         </div>
         <div class="popup-details">
             <div class="popup-actions">
-                <button class="play-btn" title="Play">▶</button>
-                <button class="popup-add-btn" title="${isInMyList(item.id) ? 'Remove from My List' : 'Add to My List'}">${isInMyList(item.id) ? '✓' : '＋'}</button>
-                <button title="Like">👍</button>
-                <button class="more-info-btn" title="More Info">ℹ</button>
+                <button class="play-btn" title="Play">${playIconSvg}</button>
+                <button class="popup-add-btn" title="${isInMyList(item.id) ? 'Remove from My List' : 'Add to My List'}">${isInMyList(item.id) ? checkIcon : plusIcon}</button>
+                <button class="like-btn" title="Like">${likeIcon}</button>
+                <button class="more-info-btn" title="More Info">${infoIcon}</button>
             </div>
             <div class="popup-meta">
                 <span>${year}</span>
@@ -1024,7 +1051,7 @@ const positionAndShowPopup = async (cardWrapper, item) => {
     if (isInMyList(item.id)) popupAddBtn.classList.add('in-list');
     popupAddBtn.addEventListener('click', () => {
         const added = toggleMyList(item);
-        popupAddBtn.textContent = added ? '✓' : '＋';
+        popupAddBtn.innerHTML = added ? checkIcon : plusIcon;
         popupAddBtn.classList.toggle('in-list', added);
         updateHeroAddBtn();
     });
@@ -1047,7 +1074,25 @@ const positionAndShowPopup = async (cardWrapper, item) => {
     popup.style.left = `${left}px`;
     popup.style.top = `${top}px`;
 
-    setTimeout(() => popup.classList.add('active'), 10);
+    // Reveal only once the banner art has decoded, so it doesn't stutter / pop in
+    // mid-animation. rAF ensures the starting transform is committed before we flip to
+    // .active (otherwise the browser can skip the transition). Falls back after 350ms so
+    // a slow image never leaves the popup stuck hidden.
+    let revealed = false;
+    const reveal = () => {
+        if (revealed) return;
+        revealed = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => popup.classList.add('active')));
+    };
+    if (bannerUrl) {
+        const pre = new Image();
+        pre.onload = reveal;
+        pre.onerror = reveal;
+        pre.src = bannerUrl;
+        setTimeout(reveal, 350);
+    } else {
+        reveal();
+    }
 
     cardWrapper.parentElement.querySelectorAll('.poster-card-wrapper').forEach(sib => {
         if (sib !== cardWrapper) sib.classList.add('dimmed');
@@ -1366,6 +1411,7 @@ const playHeroTrailerAfterDelay = () => {
             if (trailer) {
                 const muteState = isHeroMuted ? 1 : 0;
                 heroVideoContainer.innerHTML = `<iframe src="${buildTrailerEmbedUrl(trailer.key, muteState)}" allow="autoplay; encrypted-media" frameborder="0"></iframe>`;
+                mountTrailerLoop(heroVideoContainer.querySelector('iframe'));
                 heroVideoContainer.classList.add('visible');
                 updateMuteButtonIcon();
                 heroMuteBtn.style.display = 'flex';
@@ -1582,6 +1628,7 @@ const openDetailsModal = async (item) => {
     if (trailer) {
         const muteState = isModalMuted ? 1 : 0;
         modalBackdrop.innerHTML = `<iframe src="${buildTrailerEmbedUrl(trailer.key, muteState)}" allow="autoplay; encrypted-media" frameborder="0"></iframe>`;
+        mountTrailerLoop(modalBackdrop.querySelector('iframe'));
         updateModalMuteButton();
         document.getElementById('modal-mute-btn').style.display = 'flex';
     } else {
