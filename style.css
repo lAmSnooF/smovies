@@ -1869,8 +1869,11 @@ nav .search-container:focus-within > svg { color: #fff; }
     right: 0;
     height: calc(var(--mobile-nav-height) + var(--safe-bottom));
     padding-bottom: var(--safe-bottom);
-    background-color: rgba(20,20,20,0.98);
-    border-top: 1px solid #2a2a2a;
+    background: rgba(18, 18, 20, 0.8);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.4);
     z-index: 1000;
     justify-content: space-around;
     align-items: stretch;
@@ -1881,15 +1884,32 @@ nav .search-container:focus-within > svg { color: #fff; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    color: #888;
+    gap: 4px;
+    color: #8a8a8a;
     text-decoration: none;
-    font-size: 0.65rem;
-    padding-top: 6px;
-    transition: color 0.2s;
+    font-size: 0.62rem;
+    font-weight: 500;
+    padding-top: 8px;
+    position: relative;
+    transition: color 0.2s ease, transform 0.12s ease;
 }
-.mobile-nav-item svg { width: 22px; height: 22px; }
+.mobile-nav-item svg { width: 23px; height: 23px; transition: transform 0.2s ease; }
+.mobile-nav-item:active { transform: scale(0.9); }
 .mobile-nav-item.active { color: #fff; }
+.mobile-nav-item.active svg { transform: translateY(-1px) scale(1.06); }
+/* Accent indicator bar along the top edge of the active tab */
+.mobile-nav-item.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--accent);
+    box-shadow: 0 0 10px rgba(229, 9, 20, 0.6);
+}
 
 /* ===== MOBILE SEARCH OVERLAY ===== */
 .search-overlay {
@@ -1964,7 +1984,7 @@ nav .search-container:focus-within > svg { color: #fff; }
 
     /* Show top-bar search icon, hide desktop search input */
     #mobile-search-btn { display: flex; }
-    .search-container { display: none; }
+    nav .search-container { display: none; }
 
     .profile-gate-title { font-size: 5vw; }
 }
@@ -1999,7 +2019,7 @@ nav .search-container:focus-within > svg { color: #fff; }
     nav .logo { font-size: 1.5em; }
     nav .nav-links { display: none; }
     #mobile-search-btn { display: none; } /* search lives in the bottom nav on phones */
-    .search-container { display: none; }
+    nav .search-container { display: none; }
 
     /* Show bottom nav */
     #mobile-nav { display: flex; }
