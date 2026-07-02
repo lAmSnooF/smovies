@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=13">
+    <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 
@@ -143,8 +143,14 @@
                     <div class="profile-dropdown" id="profile-dropdown">
                         <div id="profile-dropdown-list"></div>
                         <div class="profile-dropdown-divider"></div>
-                        <a href="#" id="nav-manage-profiles" class="profile-dropdown-link">Manage Profiles</a>
-                        <a href="#" id="nav-switch-profile" class="profile-dropdown-link">Switch Profile</a>
+                        <a href="#" id="nav-manage-profiles" class="profile-dropdown-link">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
+                            <span>Manage Profiles</span>
+                        </a>
+                        <a href="#" id="nav-switch-profile" class="profile-dropdown-link">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M7.41 18.59L8.83 20 12 16.83 15.17 20l1.41-1.41L12 14l-4.59 4.59zM16.59 5.41L15.17 4 12 7.17 8.83 4 7.41 5.41 12 10l4.59-4.59z"></path></svg>
+                            <span>Switch Profile</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -301,6 +307,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=13"></script>
+    <script src="script.js?v=14"></script>
 </body>
 </html>
