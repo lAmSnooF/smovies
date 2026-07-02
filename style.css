@@ -1284,17 +1284,30 @@ nav .search-container:focus-within > svg { color: #fff; }
     pointer-events: none;
     z-index: 1;
 }
-/* Title-logo art, raised so it sits above the episode label + progress bar */
+/* Title-logo art, raised so it sits above the episode label + progress bar.
+   Bounded box (left+right give it a real width) + small height so wide logos are
+   contained rather than scaled to the height and clipped off the right edge. */
 .continue-card .card-logo {
     left: 12px;
-    right: auto;
-    bottom: 16px;
-    height: 46%;
-    max-width: 62%;
+    right: 64px;
+    top: auto;
+    bottom: 14px;
+    height: 34%;
     padding: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    overflow: hidden;
     z-index: 2;
 }
-.continue-card .card-logo .card-logo-img { max-width: 100%; max-height: 100%; }
+.continue-card .card-logo .card-logo-img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: left bottom;
+}
 /* When the logo loads it replaces the plain-text title fallback */
 .continue-wrapper.has-logo .continue-label { display: none; }
 .continue-ep {
