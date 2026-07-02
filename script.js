@@ -1372,6 +1372,13 @@ const updateHero = async (page, token) => {
     };
     updateHeroAddBtn();
 
+    // Kick off the trailer now that the hero item is set. On first load the
+    // IntersectionObserver's initial fire schedules a trailer, but the stopHeroTrailer()
+    // above (which runs later, once the hero data resolves) would clear that timer — so
+    // without this the trailer wouldn't start until you scrolled the hero out and back.
+    // The page is always scrolled to the top when the hero (re)loads, so it's in view.
+    playHeroTrailerAfterDelay();
+
     // Then enrich with the official title-logo art and age rating.
     const details = await apiFetch(`/${mediaType}/${heroData.id}`, '&append_to_response=content_ratings,images&include_image_language=en,null');
     if (token !== pageLoadToken) return; // stale by the time details arrived
@@ -1396,6 +1403,18 @@ const toggleHeroMute = () => {
     if (player) {
         const command = isHeroMuted ? 'mute' : 'unMute';
         player.contentWindow.postMessage(JSON.stringify({ event: 'command', func: command, args: [] }), '*');
+    }
+};
+
+// Force the hero trailer muted (e.g. when a details modal opens) so its audio never
+// plays underneath the modal's own trailer. No-op if it's already muted.
+const muteHeroTrailer = () => {
+    if (isHeroMuted) return;
+    isHeroMuted = true;
+    updateMuteButtonIcon();
+    const player = heroVideoContainer.querySelector('iframe');
+    if (player) {
+        try { player.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*'); } catch (e) {}
     }
 };
 
@@ -1530,7 +1549,9 @@ function createGridCard(item, parentMediaType) {
     const inList = isInMyList(item.id);
 
     card.innerHTML = `
-        <div class="grid-card-img" style="background-image: url(${IMAGE_BASE_URL}w500${item.backdrop_path || item.poster_path})"></div>
+        <div class="grid-card-img" style="background-image: url(${IMAGE_BASE_URL}w500${item.backdrop_path || item.poster_path})">
+            <div class="card-logo"></div>
+        </div>
         <div class="grid-card-info">
             <div class="grid-card-header">
                 <div class="grid-card-meta">
@@ -1541,6 +1562,12 @@ function createGridCard(item, parentMediaType) {
             <p class="grid-card-overview">${item.overview ? item.overview.substring(0, 100) + '...' : ''}</p>
         </div>
     `;
+
+    // Overlay the official title-logo art on the banner, like the home-row cards.
+    // Reuses the same lazy loader (loadCardLogo reads _item, fills .card-logo, adds .has-logo).
+    card._item = item;
+    cardLogoObserver.observe(card);
+
     const addBtn = card.querySelector('.grid-card-add-btn');
     addBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1607,6 +1634,9 @@ const toggleModalMute = () => {
 };
 
 const openDetailsModal = async (item) => {
+    // Silence the hero trailer so it and the modal's trailer don't play over each other.
+    muteHeroTrailer();
+
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
     const details = await apiFetch(`/${mediaType}/${item.id}`, `&append_to_response=credits,videos,content_ratings,recommendations,keywords,images&include_image_language=en,null`);
 

@@ -1779,6 +1779,8 @@ nav .search-container {
     background-position: center;
     background-color: #333;
 }
+/* Official title-logo art overlaid on the recommendation banners (see .card-logo). */
+.grid-card.has-logo .card-logo { opacity: 1; }
 .grid-card-info { padding: 15px; }
 .grid-card-header {
     display: flex;
