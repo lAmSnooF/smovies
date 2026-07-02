@@ -684,74 +684,6 @@ nav .search-container {
 }
 .icon-btn:hover { background: rgba(255,255,255,0.1); }
 
-/* Player Selector */
-.player-selector-container {
-    position: relative;
-}
-#player-selector-btn {
-    background: transparent;
-    border: none;
-    color: #fff;
-    font-size: 0.95em;
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    border-radius: 4px;
-}
-#player-selector-btn:hover { background: rgba(255,255,255,0.08); }
-#player-selector-btn .server-icon { flex-shrink: 0; opacity: 0.9; }
-#player-selector-btn .dropdown-arrow {
-    width: 20px;
-    height: 20px;
-    transition: transform 0.2s ease;
-}
-.player-selector-container.menu-open .dropdown-arrow {
-    transform: rotate(180deg);
-}
-.player-menu {
-    display: none;
-    position: absolute;
-    top: 120%;
-    right: 0;
-    background-color: rgba(20, 20, 20, 0.97);
-    border: 1px solid #444;
-    border-radius: 4px;
-    width: 170px;
-    z-index: 1001;
-    overflow: hidden;
-}
-.player-selector-container.menu-open .player-menu {
-    display: block;
-}
-.player-menu .menu-header {
-    padding: 10px 15px;
-    font-size: 0.8em;
-    color: #aaa;
-    border-bottom: 1px solid #444;
-}
-.player-menu ul {
-    list-style: none;
-    margin: 0;
-    padding: 5px 0;
-}
-.player-menu li {
-    padding: 11px 15px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: background-color 0.2s;
-}
-.player-menu li:hover {
-    background-color: #3a3a3a;
-}
-.player-menu li .checkmark {
-    color: var(--accent);
-}
-
 /* Profile Nav Dropdown */
 .profile-menu-container {
     position: relative;
@@ -1969,8 +1901,6 @@ nav .search-container {
     /* No hover popups on touch/narrow devices */
     .hover-popup { display: none !important; }
 
-    /* Compact player selector — icon only */
-    #current-player-name { display: none; }
 
     /* Show top-bar search icon, hide desktop search input */
     #mobile-search-btn { display: flex; }

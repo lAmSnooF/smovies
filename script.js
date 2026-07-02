@@ -340,10 +340,6 @@ const navLinks = document.querySelectorAll('.nav-link');
 const continueWatchingSection = document.getElementById('continue-watching-section');
 const continueWatchingDisplay = document.getElementById('continue-watching-display');
 const detailsModal = document.getElementById('details-modal');
-const playerSelectorContainer = document.querySelector('.player-selector-container');
-const playerSelectorBtn = document.getElementById('player-selector-btn');
-const playerMenu = document.getElementById('player-menu');
-const currentPlayerName = document.getElementById('current-player-name');
 const myListPage = document.getElementById('mylist-page');
 const myListGrid = document.getElementById('mylist-grid');
 const myListEmpty = document.getElementById('mylist-empty');
@@ -359,7 +355,6 @@ let heroTrailerTimeout;
 const detailsCache = new Map();
 let isHeroMuted = false;
 let isModalMuted = false;
-let currentPlayerAPI = 'videasy';
 let editingProfileId = null;
 let addAvatarIndex = 0;
 let editAvatarIndex = 0;
@@ -1768,65 +1763,27 @@ const loadMedia = (mediaItem, season = 1, episode = 1, startTime = 0) => {
 };
 
 const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
-    let embedUrl = '';
     const tmdbId = mediaItem.id;
     const mediaType = mediaItem.media_type || mediaItem.mediaType || (mediaItem.title ? 'movie' : 'tv');
     const start = Math.floor(startTime || 0);
 
-    if (currentPlayerAPI === 'videasy') {
-        const base = 'https://player.videasy.net/';
-        const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
-        const params = new URLSearchParams({
-            color: ACCENT_HEX,
-            episodeSelector: 'true',
-            nextEpisode: 'true',
-            autoplayNextEpisode: 'true',
-            overlay: 'true'
-        });
-        if (start > 0) params.set('progress', start);
-        embedUrl = `${base}${path}?${params.toString()}`;
+    const base = 'https://player.videasy.net/';
+    const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
+    const params = new URLSearchParams({
+        color: ACCENT_HEX,
+        episodeSelector: 'true',
+        nextEpisode: 'true',
+        autoplayNextEpisode: 'true',
+        overlay: 'true'
+    });
+    if (start > 0) params.set('progress', start);
+    const embedUrl = `${base}${path}?${params.toString()}`;
 
-    } else if (currentPlayerAPI === 'vidking') {
-        const vidkingBaseUrl = 'https://www.vidking.net/embed/';
-        const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
-        const params = new URLSearchParams({
-            color: ACCENT_HEX,
-            nextEpisode: 'true',
-            episodeSelector: 'true',
-            autoPlay: 'true'
-        });
-        if (start > 0) params.set('progress', start);
-        embedUrl = `${vidkingBaseUrl}${path}?${params.toString()}`;
-
-    } else if (currentPlayerAPI === 'vidsrc') {
-        const vidsrcBaseUrl = 'https://vidsrc.xyz/embed/';
-        const path = mediaType === 'movie'
-            ? `movie?tmdb=${tmdbId}`
-            : `tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
-        embedUrl = `${vidsrcBaseUrl}${path}`;
-
-    } else if (currentPlayerAPI === 'anyembed') {
-        const anyembedBaseUrl = 'https://player.autoembed.cc/embed/';
-        const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
-        embedUrl = `${anyembedBaseUrl}${path}`;
-
-    } else if (currentPlayerAPI === 'vidlink') {
-        const vidlinkBaseUrl = 'https://vidlink.pro/';
-        const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
-        const params = new URLSearchParams({
-            primaryColor: ACCENT_HEX,
-            autoplay: 'true',
-            nextButton: 'true',
-            episodeList: 'true'
-        });
-        embedUrl = `${vidlinkBaseUrl}${path}?${params.toString()}`;
-    }
-
-    // NOTE: These players actively detect the iframe `sandbox` attribute and refuse to
-    // run ("Iframe Sandbox Detected"), so we cannot block their popups/redirects in-page.
+    // NOTE: Videasy actively detects the iframe `sandbox` attribute and refuses to
+    // run ("Iframe Sandbox Detected"), so we cannot block its popups/redirects in-page.
     // Ad-blocking has to be done at the browser level (uBlock Origin / Brave / AdGuard DNS).
 
-    // The players render the real <video> inside a NESTED cross-origin iframe. A bare
+    // Videasy renders the real <video> inside a NESTED cross-origin iframe. A bare
     // `allow="fullscreen"` only grants the feature to the player's own origin (the default
     // 'src' allowlist), so the nested stream frame is denied and the fullscreen button does
     // nothing on desktop. The `*` allowlist propagates fullscreen/autoplay/etc. down the
@@ -1922,32 +1879,6 @@ function handleMobileSearch() {
             searchOverlayResults.appendChild(row);
         });
     }, 350);
-}
-
-// --- API Selector Logic ---
-const VALID_PLAYERS = ['videasy', 'vidking', 'vidsrc', 'anyembed', 'vidlink'];
-const PLAYER_DISPLAY_NAMES = { videasy: 'Videasy', vidking: 'VidKing', vidsrc: 'VidSrc', anyembed: 'Anyembed', vidlink: 'VidLink' };
-
-function setPlayerAPI(apiName) {
-    if (!VALID_PLAYERS.includes(apiName)) {
-        apiName = 'videasy';
-    }
-
-    currentPlayerAPI = apiName;
-    localStorage.setItem('playerAPI', apiName);
-
-    currentPlayerName.textContent = PLAYER_DISPLAY_NAMES[apiName] || apiName;
-
-    document.querySelectorAll('#player-menu li').forEach(li => {
-        const checkmark = li.querySelector('.checkmark');
-        if (li.dataset.api === apiName) {
-            li.classList.add('active');
-            if (checkmark) checkmark.style.display = 'inline';
-        } else {
-            li.classList.remove('active');
-            if (checkmark) checkmark.style.display = 'none';
-        }
-    });
 }
 
 // --- NAVIGATION (desktop + mobile in sync) ---
@@ -2117,13 +2048,6 @@ document.getElementById('nav-switch-profile').addEventListener('click', (e) => {
 
 // Combined click-outside logic
 document.addEventListener('click', (e) => {
-    const isPlayerSelectorButton = e.target.closest('#player-selector-btn');
-    if (isPlayerSelectorButton) {
-        playerSelectorContainer.classList.toggle('menu-open');
-    } else if (!e.target.closest('.player-selector-container')) {
-        playerSelectorContainer.classList.remove('menu-open');
-    }
-
     if (!e.target.closest('.profile-menu-container')) {
         document.getElementById('profile-dropdown').classList.remove('open');
         document.querySelector('.profile-menu-container').classList.remove('open');
@@ -2152,14 +2076,6 @@ document.addEventListener('keydown', (e) => {
     if (playerScreen.classList.contains('active')) { showHomeScreen(); return; }
 });
 
-playerMenu.addEventListener('click', (e) => {
-    const targetLi = e.target.closest('li');
-    if (targetLi && targetLi.dataset.api) {
-        setPlayerAPI(targetLi.dataset.api);
-        playerSelectorContainer.classList.remove('menu-open');
-    }
-});
-
 
 // --- Initialization & Observers ---
 const heroObserver = new IntersectionObserver((entries) => {
@@ -2179,9 +2095,6 @@ const rowObserver = new IntersectionObserver((entries, observer) => {
 }, { rootMargin: '0px 0px 200px 0px' });
 
 document.addEventListener('DOMContentLoaded', () => {
-    const savedAPI = localStorage.getItem('playerAPI') || 'videasy';
-    setPlayerAPI(savedAPI);
-
     initProfiles();
     renderProfileScreen();
     showScreen(profileScreen);
