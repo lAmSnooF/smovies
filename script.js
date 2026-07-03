@@ -4,16 +4,6 @@ const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/';
 const ACCENT_HEX = 'e50914';
 
-// --- NATIVE PLAYER (optional, per-profile "Native" player option) ---
-// Paste your deployed movie-web "simple-proxy" Cloudflare Worker URL here (see
-// NATIVE_PLAYER.md for the free 5-min setup). While this is blank, the "Native" profile
-// option silently falls back to the Videasy iframe, so nothing breaks without it.
-const NATIVE_PROXY_URL = '';
-// CDN ESM builds — no build step needed. Pinned for stability.
-// jsDelivr's +esm fully bundles @movie-web/providers (esm.sh chokes on a react-native sub-dep).
-const PROVIDERS_ESM = 'https://cdn.jsdelivr.net/npm/@movie-web/providers@2.4.13/+esm';
-const HLS_ESM = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.15/+esm';
-
 // Build a clean, chrome-free YouTube embed URL for background trailers (hero + details modal).
 // The goal is video only — no control bar, no captions, no fullscreen/keyboard UI, no
 // end-screen suggestions or annotations — so it reads as ambient art rather than a player.
@@ -132,20 +122,9 @@ function createDefaultProfile() {
         name: 'User',
         avatarIndex: 0,
         isKids: false,
-        player: 'videasy',
         tastes: [],
         myList: [],
     };
-}
-
-// Highlight the active option in a Videasy/Native segmented control and wire clicks.
-function renderPlayerChoice(containerId, current, onPick) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.querySelectorAll('button[data-player]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.player === current);
-        btn.onclick = () => onPick(btn.dataset.player);
-    });
 }
 
 function initProfiles() {
@@ -379,8 +358,6 @@ let isModalMuted = false;
 let editingProfileId = null;
 let addAvatarIndex = 0;
 let editAvatarIndex = 0;
-let editPlayerChoice = 'videasy';
-let addPlayerChoice = 'videasy';
 let tasteSelections = [];
 let currentPage = 'home';
 // Bumped on every page load; async work checks it so a slow request from a page the
@@ -735,10 +712,6 @@ function openEditProfile(profileId) {
     document.getElementById('edit-kids-toggle').checked = profile.isKids;
     rerenderEditAvatarPicker();
 
-    editPlayerChoice = profile.player === 'native' ? 'native' : 'videasy';
-    const onEditPick = (p) => { editPlayerChoice = p; renderPlayerChoice('edit-player-choice', p, onEditPick); };
-    renderPlayerChoice('edit-player-choice', editPlayerChoice, onEditPick);
-
     document.getElementById('delete-profile-btn').style.display = profiles.length > 1 ? 'inline-block' : 'none';
 
     showScreen(profileEditScreen);
@@ -771,9 +744,6 @@ function openAddProfile() {
     document.getElementById('add-profile-name').value = '';
     document.getElementById('add-kids-toggle').checked = false;
     rerenderAddAvatarPicker();
-    addPlayerChoice = 'videasy';
-    const onAddPick = (p) => { addPlayerChoice = p; renderPlayerChoice('add-player-choice', p, onAddPick); };
-    renderPlayerChoice('add-player-choice', addPlayerChoice, onAddPick);
     showScreen(profileAddScreen);
 }
 
@@ -1833,20 +1803,7 @@ const loadMedia = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     if (document.getElementById('search-overlay').classList.contains('active')) closeSearchOverlay();
 };
 
-// Dispatcher: use the active profile's chosen player. "native" scrapes a direct stream and
-// plays it in an HTML5 <video> (fast, cineby-style); anything else — or any failure — uses
-// the Videasy iframe. Videasy is always the safe default + fallback.
-const getActivePlayer = () => (getActiveProfile()?.player === 'native' ? 'native' : 'videasy');
-
 const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
-    if (getActivePlayer() === 'native' && NATIVE_PROXY_URL) {
-        generateNativePlayer(mediaItem, season, episode, startTime);
-    } else {
-        generateVideasyPlayer(mediaItem, season, episode, startTime);
-    }
-};
-
-const generateVideasyPlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     const tmdbId = mediaItem.id;
     const mediaType = mediaItem.media_type || mediaItem.mediaType || (mediaItem.title ? 'movie' : 'tv');
     const start = Math.floor(startTime || 0);
@@ -1878,106 +1835,6 @@ const generateVideasyPlayer = (mediaItem, season = 1, episode = 1, startTime = 0
     // legacy webkit/moz boolean attributes for older engines.
     playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen webkitallowfullscreen mozallowfullscreen allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *"></iframe>`;
 };
-
-// --- NATIVE PLAYER: scrape a direct stream (via the proxy Worker) and play it in <video> ---
-let playerLoadToken = 0;
-
-// Build the @movie-web/providers "scrapeMedia" object from a TMDB item.
-async function buildScrapeMedia(mediaType, mediaItem, season, episode) {
-    const details = detailsCache.get(mediaItem.id)
-        || await apiFetch(`/${mediaType}/${mediaItem.id}`, '&append_to_response=external_ids');
-    const title = details.title || details.name || mediaItem.title || mediaItem.name || '';
-    const yr = (details.release_date || details.first_air_date || '').slice(0, 4);
-    const releaseYear = yr ? Number(yr) : undefined;
-    const tmdbId = String(mediaItem.id);
-    const imdbId = details.external_ids?.imdb_id || details.imdb_id || undefined;
-    if (mediaType === 'movie') return { type: 'movie', title, releaseYear, tmdbId, imdbId };
-    const seasonData = await apiFetch(`/tv/${mediaItem.id}/season/${season}`);
-    const ep = (seasonData.episodes || []).find(e => e.episode_number === Number(episode));
-    return {
-        type: 'show', title, releaseYear, tmdbId, imdbId,
-        season: { number: Number(season), tmdbId: String(seasonData.id || '') },
-        episode: { number: Number(episode), tmdbId: String(ep?.id || '') },
-    };
-}
-
-async function generateNativePlayer(mediaItem, season = 1, episode = 1, startTime = 0) {
-    const mediaType = mediaItem.media_type || mediaItem.mediaType || (mediaItem.title ? 'movie' : 'tv');
-    const token = ++playerLoadToken;
-    const fallback = () => { if (token === playerLoadToken) generateVideasyPlayer(mediaItem, season, episode, startTime); };
-    playerPreview.innerHTML = `<div class="native-status"><div class="native-spinner"></div><p>Finding a source…</p></div>`;
-    try {
-        const [prov, hlsMod] = await Promise.all([import(PROVIDERS_ESM), import(HLS_ESM)]);
-        if (token !== playerLoadToken) return;
-        const { makeProviders, makeStandardFetcher, makeSimpleProxyFetcher, targets } = prov;
-        const providers = makeProviders({
-            fetcher: makeStandardFetcher(fetch),
-            proxiedFetcher: makeSimpleProxyFetcher(NATIVE_PROXY_URL, fetch),
-            target: targets.BROWSER,
-        });
-        const media = await buildScrapeMedia(mediaType, mediaItem, season, episode);
-        if (token !== playerLoadToken) return;
-        const output = await providers.runAll({ media });
-        if (token !== playerLoadToken) return;
-        if (!output || !output.stream) throw new Error('no source found');
-        playNativeStream(output.stream, hlsMod.default, startTime, token, fallback);
-    } catch (e) {
-        console.warn('[native player] falling back to Videasy:', e && e.message);
-        fallback();
-    }
-}
-
-function playNativeStream(stream, Hls, startTime, token, onFail) {
-    if (token !== playerLoadToken) return;
-    const video = document.createElement('video');
-    video.className = 'native-video';
-    video.controls = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    playerPreview.innerHTML = '';
-    playerPreview.appendChild(video);
-
-    (stream.captions || []).forEach((cap, i) => {
-        if (!cap.url) return;
-        const track = document.createElement('track');
-        track.kind = 'subtitles';
-        track.label = cap.language || cap.type || `Subtitle ${i + 1}`;
-        track.srclang = cap.language || 'en';
-        track.src = cap.url;
-        if (i === 0) track.default = true;
-        video.appendChild(track);
-    });
-
-    const resume = () => { if (startTime > 1) { try { video.currentTime = startTime; } catch (e) {} } };
-    // If playback errors out (e.g. a stream needs headers we can't send), drop to Videasy once.
-    let failed = false;
-    const fail = () => { if (!failed) { failed = true; onFail && onFail(); } };
-    video.addEventListener('error', fail);
-
-    if (stream.type === 'hls') {
-        const src = stream.playlist;
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = src;
-            video.addEventListener('loadedmetadata', resume, { once: true });
-        } else if (Hls.isSupported()) {
-            const hls = new Hls({ enableWorker: true });
-            hls.on(Hls.Events.ERROR, (_e, data) => { if (data && data.fatal) fail(); });
-            hls.on(Hls.Events.MANIFEST_PARSED, resume);
-            hls.loadSource(src);
-            hls.attachMedia(video);
-        } else {
-            video.src = src;
-        }
-    } else if (stream.type === 'file') {
-        const q = stream.qualities || {};
-        const pick = q['1080'] || q['720'] || q['480'] || q['360'] || q.unknown || Object.values(q)[0];
-        if (pick && pick.url) {
-            video.src = pick.url;
-            video.addEventListener('loadedmetadata', resume, { once: true });
-        } else { fail(); return; }
-    }
-    video.play().catch(() => {});
-}
 
 
 // --- Search Logic ---
@@ -2138,7 +1995,6 @@ document.getElementById('save-profile-btn').addEventListener('click', () => {
     profile.name = newName;
     profile.avatarIndex = editAvatarIndex;
     profile.isKids = document.getElementById('edit-kids-toggle').checked;
-    profile.player = editPlayerChoice;
     saveProfiles(profiles);
     renderProfileManageScreen();
     showScreen(profileManageScreen);
@@ -2175,7 +2031,6 @@ document.getElementById('create-profile-btn').addEventListener('click', () => {
         name: name,
         avatarIndex: addAvatarIndex,
         isKids: document.getElementById('add-kids-toggle').checked,
-        player: addPlayerChoice,
         tastes: [],
         myList: [],
     };
