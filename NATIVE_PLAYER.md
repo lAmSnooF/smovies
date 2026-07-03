@@ -13,13 +13,12 @@ Browsers block cross-origin video (CORS), and streaming CDNs never send CORS hea
 
 ## 1. Deploy the proxy (~5 minutes, free)
 
-This uses movie-web's official **simple-proxy** Worker.
+Use the self-contained Worker file in this repo — [`cloudflare-worker.js`](cloudflare-worker.js). It's protocol-compatible with the scraper, so there's no repo to hunt down and no build step.
 
 1. Make a free account at <https://dash.cloudflare.com> (no card needed).
 2. In the dashboard: **Workers & Pages → Create → Create Worker**. Give it a name (e.g. `sflix-proxy`) and click **Deploy**.
 3. Click **Edit code**. Select all the template code and delete it.
-4. Open the latest `simple-proxy` Cloudflare build and copy its contents:
-   <https://github.com/movie-web/simple-proxy> → grab `simple-proxy-cloudflare.mjs` from the newest release (Releases tab), or use a maintained mirror. Paste it into the Worker editor.
+4. Copy the **entire contents of [`cloudflare-worker.js`](cloudflare-worker.js)** from this repo and paste it into the editor.
 5. Click **Deploy**. Copy your Worker URL — it looks like `https://sflix-proxy.YOUR-NAME.workers.dev`.
 
 ## 2. Point SFLIX at your proxy
