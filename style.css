@@ -405,6 +405,66 @@ nav#main-nav .logo img { height: 48px; }
     font-size: 0.85em;
     padding-left: 40px;
 }
+
+/* Per-profile player choice (segmented control) */
+.player-field { display: flex; flex-direction: column; gap: 8px; }
+.player-field-label { font-size: 1.1em; color: #fff; font-weight: 500; }
+.player-choice {
+    display: inline-flex;
+    width: fit-content;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 999px;
+    padding: 3px;
+}
+.player-choice button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: #cfcfcf;
+    padding: 8px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.92em;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s, color 0.2s;
+}
+.player-choice button.active { background: var(--accent); color: #fff; }
+.beta-tag {
+    font-size: 0.6em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(255,255,255,0.22);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+.player-field-hint { color: var(--text-dim); font-size: 0.85em; max-width: 360px; line-height: 1.4; }
+
+/* Native (HTML5) player */
+.native-video { width: 100%; height: 100%; background: #000; display: block; }
+.native-status {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: #b3b3b3;
+}
+.native-spinner {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.15);
+    border-top-color: var(--accent);
+    animation: nativeSpin 0.8s linear infinite;
+}
+@keyframes nativeSpin { to { transform: rotate(360deg); } }
 .profile-edit-actions {
     display: flex;
     gap: 15px;
