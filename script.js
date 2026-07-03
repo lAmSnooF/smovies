@@ -1661,6 +1661,8 @@ const toggleModalMute = () => {
 const openDetailsModal = async (item) => {
     // Silence the hero trailer so it and the modal's trailer don't play over each other.
     muteHeroTrailer();
+    // The user is looking at a title — warm the player connection so Play loads fast.
+    warmVideasyConnection();
 
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
     const details = await apiFetch(`/${mediaType}/${item.id}`, `&append_to_response=credits,videos,content_ratings,recommendations,keywords,images&include_image_language=en,null`);
@@ -1766,6 +1768,19 @@ const closeDetailsModal = () => {
 };
 
 // --- Player Logic ---
+// Re-open a warm TCP/TLS connection to the Videasy origin right before the user is likely
+// to hit Play (browsers drop idle preconnects after ~10s), so the player iframe starts
+// loading without a cold DNS+TLS handshake. Called when a details modal opens.
+function warmVideasyConnection() {
+    const prev = document.getElementById('videasy-warm');
+    if (prev) prev.remove();
+    const link = document.createElement('link');
+    link.id = 'videasy-warm';
+    link.rel = 'preconnect';
+    link.href = 'https://player.videasy.to';
+    document.head.appendChild(link);
+}
+
 const loadMedia = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     stopHeroTrailer();
     const mediaType = mediaItem.media_type || mediaItem.mediaType || (mediaItem.title ? 'movie' : 'tv');
@@ -1793,7 +1808,10 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     const mediaType = mediaItem.media_type || mediaItem.mediaType || (mediaItem.title ? 'movie' : 'tv');
     const start = Math.floor(startTime || 0);
 
-    const base = 'https://player.videasy.net/';
+    // Embed player.videasy.TO directly: player.videasy.NET 301-redirects to it, so using
+    // .net makes every Play pay an extra DNS+TLS+round-trip for the redirect (~4x slower
+    // initial load). If .to ever stops resolving, revert this to .net.
+    const base = 'https://player.videasy.to/';
     const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
     const params = new URLSearchParams({
         color: ACCENT_HEX,
