@@ -1,0 +1,6 @@
+# Config for deploying the native-player CORS proxy (cloudflare-worker.js) as a
+# Cloudflare Worker via `npx wrangler deploy`. This does NOT affect the GitHub Pages
+# site — it only tells wrangler which file is the Worker entry point.
+name = "sflix-proxy"
+main = "cloudflare-worker.js"
+compatibility_date = "2024-11-01"
