@@ -1768,6 +1768,54 @@ const closeDetailsModal = () => {
 };
 
 // --- Player Logic ---
+
+// Available embed players. `build()` returns the iframe `src` for a given title.
+// The user picks one on the Player selection screen; the choice persists in
+// localStorage and defaults to Videasy.
+const PLAYERS = {
+    videasy: {
+        id: 'videasy',
+        name: 'Videasy',
+        description: 'Recommended. Clean player with an episode selector, autoplay-next and resume where you left off.',
+        recommended: true,
+        // Embed player.videasy.TO directly: player.videasy.NET 301-redirects to it, so using
+        // .net makes every Play pay an extra DNS+TLS+round-trip for the redirect (~4x slower
+        // initial load). If .to ever stops resolving, revert this to .net.
+        build: ({ mediaType, tmdbId, season, episode, start }) => {
+            const base = 'https://player.videasy.to/';
+            const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
+            const params = new URLSearchParams({
+                color: ACCENT_HEX,
+                episodeSelector: 'true',
+                nextEpisode: 'true',
+                autoplayNextEpisode: 'true',
+                overlay: 'true'
+            });
+            if (start > 0) params.set('progress', start);
+            return `${base}${path}?${params.toString()}`;
+        }
+    },
+    vidsrc: {
+        id: 'vidsrc',
+        name: 'VidSrc',
+        description: "Alternate source. Try this if a title is missing from Videasy or won't load.",
+        // VidSrc takes a TMDB id directly (same ids we use everywhere else).
+        build: ({ mediaType, tmdbId, season, episode }) => {
+            const base = 'https://vidsrc-embed.ru/embed/';
+            if (mediaType === 'movie') return `${base}movie?tmdb=${tmdbId}&autoplay=1`;
+            return `${base}tv?tmdb=${tmdbId}&season=${season}&episode=${episode}&autoplay=1&autonext=1`;
+        }
+    }
+};
+
+const getSelectedPlayer = () => {
+    const id = localStorage.getItem('smovies_player');
+    return (id && PLAYERS[id]) ? id : 'videasy';
+};
+const setSelectedPlayer = (id) => {
+    if (PLAYERS[id]) localStorage.setItem('smovies_player', id);
+};
+
 // Re-open a warm TCP/TLS connection to the Videasy origin right before the user is likely
 // to hit Play (browsers drop idle preconnects after ~10s), so the player iframe starts
 // loading without a cold DNS+TLS handshake. Called when a details modal opens.
@@ -1808,20 +1856,8 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     const mediaType = mediaItem.media_type || mediaItem.mediaType || (mediaItem.title ? 'movie' : 'tv');
     const start = Math.floor(startTime || 0);
 
-    // Embed player.videasy.TO directly: player.videasy.NET 301-redirects to it, so using
-    // .net makes every Play pay an extra DNS+TLS+round-trip for the redirect (~4x slower
-    // initial load). If .to ever stops resolving, revert this to .net.
-    const base = 'https://player.videasy.to/';
-    const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
-    const params = new URLSearchParams({
-        color: ACCENT_HEX,
-        episodeSelector: 'true',
-        nextEpisode: 'true',
-        autoplayNextEpisode: 'true',
-        overlay: 'true'
-    });
-    if (start > 0) params.set('progress', start);
-    const embedUrl = `${base}${path}?${params.toString()}`;
+    const player = PLAYERS[getSelectedPlayer()] || PLAYERS.videasy;
+    const embedUrl = player.build({ mediaType, tmdbId, season, episode, start });
 
     // NOTE: Videasy actively detects the iframe `sandbox` attribute and refuses to
     // run ("Iframe Sandbox Detected"), so we cannot block its popups/redirects in-page.
@@ -1835,6 +1871,72 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     // legacy webkit/moz boolean attributes for older engines.
     playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen webkitallowfullscreen mozallowfullscreen allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *"></iframe>`;
 };
+
+
+// --- Player Selection Screen ---
+const playerSelectScreen = document.getElementById('player-select-screen');
+const playerSelectList = document.getElementById('player-select-list');
+// Where to return when the selection screen closes: 'home' or 'player' (the watch screen).
+let playerSelectReturn = 'home';
+// The player selected when the screen opened, so we only re-embed if the choice changed.
+let playerAtOpen = 'videasy';
+
+function renderPlayerSelectScreen() {
+    const selected = getSelectedPlayer();
+    playerSelectList.innerHTML = '';
+    Object.values(PLAYERS).forEach(p => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'player-option' + (p.id === selected ? ' selected' : '');
+        card.innerHTML = `
+            <div class="player-option-main">
+                <div class="player-option-head">
+                    <span class="player-option-name"></span>
+                    ${p.recommended ? '<span class="player-option-badge">Default</span>' : ''}
+                </div>
+                <p class="player-option-desc"></p>
+            </div>
+            <span class="player-option-check">${checkIcon}</span>`;
+        card.querySelector('.player-option-name').textContent = p.name;
+        card.querySelector('.player-option-desc').textContent = p.description;
+        card.addEventListener('click', () => {
+            setSelectedPlayer(p.id);
+            renderPlayerSelectScreen();
+        });
+        playerSelectList.appendChild(card);
+    });
+}
+
+function openPlayerSelect(from) {
+    playerSelectReturn = from;
+    playerAtOpen = getSelectedPlayer();
+    renderPlayerSelectScreen();
+    showScreen(playerSelectScreen);
+}
+
+function closePlayerSelect() {
+    const changed = getSelectedPlayer() !== playerAtOpen;
+    if (playerSelectReturn === 'player' && currentlyPlaying) {
+        // Came from the watch screen — re-embed the current title with the new source,
+        // resuming from wherever the saved progress left off.
+        if (changed) {
+            const cp = currentlyPlaying;
+            const saved = getProgressStore()[String(cp.id)];
+            const start = (saved && saved.currentTime) ? saved.currentTime : 0;
+            generatePlayer({
+                id: cp.id,
+                media_type: cp.mediaType,
+                title: cp.title,
+                name: cp.name,
+                poster_path: cp.poster_path,
+                backdrop_path: cp.backdrop_path,
+            }, cp.season || 1, cp.episode || 1, start);
+        }
+        showScreen(playerScreen);
+    } else {
+        showHomeScreen();
+    }
+}
 
 
 // --- Search Logic ---
@@ -2089,6 +2191,18 @@ document.getElementById('nav-switch-profile').addEventListener('click', (e) => {
     renderProfileScreen();
     showScreen(profileScreen);
 });
+document.getElementById('nav-choose-player').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('profile-dropdown').classList.remove('open');
+    document.querySelector('.profile-menu-container').classList.remove('open');
+    stopHeroTrailer();
+    openPlayerSelect('home');
+});
+
+// Player selection screen: opened from the watch screen ("Player" button) or the
+// profile menu, closed via its Back button.
+document.getElementById('switch-player-btn').addEventListener('click', () => openPlayerSelect('player'));
+document.getElementById('player-select-back').addEventListener('click', closePlayerSelect);
 
 // Combined click-outside logic
 document.addEventListener('click', (e) => {

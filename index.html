@@ -20,7 +20,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
 
@@ -146,6 +146,10 @@
                     <div class="profile-dropdown" id="profile-dropdown">
                         <div id="profile-dropdown-list"></div>
                         <div class="profile-dropdown-divider"></div>
+                        <a href="#" id="nav-choose-player" class="profile-dropdown-link">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM10 8v8l5-4z"></path></svg>
+                            <span>Player</span>
+                        </a>
                         <a href="#" id="nav-manage-profiles" class="profile-dropdown-link">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
                             <span>Manage Profiles</span>
@@ -247,7 +251,21 @@
 
     <div id="player-screen" class="screen">
         <button id="back-to-home-btn">&larr; Back</button>
+        <button id="switch-player-btn" title="Change player">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM10 8v8l5-4z"></path></svg>
+            <span>Player</span>
+        </button>
         <div id="player-preview"></div>
+    </div>
+
+    <!-- ===== PLAYER SELECTION SCREEN ===== -->
+    <div id="player-select-screen" class="screen">
+        <div class="player-select-container">
+            <button id="player-select-back" class="player-select-back">&larr; Back</button>
+            <h1 class="player-select-title">Choose Player</h1>
+            <p class="player-select-subtitle">Select the source used to stream. Videasy is the default and works best &mdash; switch to VidSrc if a title is missing or won't load.</p>
+            <div id="player-select-list" class="player-select-list"></div>
+        </div>
     </div>
 
     <div id="details-modal" class="modal-overlay">
@@ -310,6 +328,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=19"></script>
+    <script src="script.js?v=20"></script>
 </body>
 </html>
