@@ -99,6 +99,67 @@ function pickBestLogo(images) {
     return [...logos].sort((a, b) => score(b) - score(a))[0];
 }
 
+// --- URL ROUTING / DEEP LINKS ---
+// The app is a single page, but we mirror "what you're watching" into the URL so a
+// refresh or a reopened tab returns to the player instead of the "Who's watching" gate.
+//   Movie:  <base>movie/<tmdbId>
+//   TV:     <base>tv/<tmdbId>/<season>/<episode>
+// <base> is the directory the app is served from ('/smovies/' on GitHub Pages, '/'
+// locally). A static host can't serve those deep paths, so 404.html bounces them back
+// to index.html and normalizeRedirectedUrl() (below) restores the clean path at boot.
+
+// Base path = everything up to the first 'movie'/'tv' route segment, or the whole
+// serving directory when there's no route. Captured once from the URL present at load.
+const BASE_PATH = (() => {
+    const segs = location.pathname.split('/').filter(Boolean);
+    const idx = segs.findIndex(s => s === 'movie' || s === 'tv');
+    const baseSegs = idx === -1 ? segs.filter(s => !s.endsWith('.html')) : segs.slice(0, idx);
+    return '/' + (baseSegs.length ? baseSegs.join('/') + '/' : '');
+})();
+
+// 404.html bounces a deep link (/smovies/tv/1399/1/1) to /smovies/?/tv/1399/1/1 so the
+// static host serves index.html with the assets still resolving against /smovies/. Once
+// the page (and its relative <script>/<link>/<img>) has loaded, turn that query back into
+// the clean path. Done here — not in <head> — so asset URLs are never affected. No-op on
+// normal loads.
+function normalizeRedirectedUrl() {
+    if (location.search[1] !== '/') return;
+    const decoded = location.search.slice(1).split('&')
+        .map(s => s.replace(/~and~/g, '&')).join('?');
+    history.replaceState(null, '', location.pathname.replace(/\/$/, '') + decoded + location.hash);
+}
+
+// Parse the current URL into a { type, id, season?, episode? } route, or null at root.
+function routeFromLocation() {
+    const segs = location.pathname.split('/').filter(Boolean);
+    const idx = segs.findIndex(s => s === 'movie' || s === 'tv');
+    if (idx === -1 || !segs[idx + 1]) return null;
+    if (segs[idx] === 'tv') {
+        return { type: 'tv', id: segs[idx + 1], season: num(segs[idx + 2]) || 1, episode: num(segs[idx + 3]) || 1 };
+    }
+    return { type: 'movie', id: segs[idx + 1] };
+}
+
+// Build the address-bar URL for a title.
+function routeUrl(mediaType, id, season, episode) {
+    return mediaType === 'tv'
+        ? `${BASE_PATH}tv/${id}/${season || 1}/${episode || 1}`
+        : `${BASE_PATH}movie/${id}`;
+}
+
+// True when that title already sits in the address bar (avoids duplicate history entries).
+function isCurrentRoute(mediaType, id, season, episode) {
+    const strip = (s) => s.replace(/\/+$/, '');
+    return strip(location.pathname) === strip(routeUrl(mediaType, id, season, episode));
+}
+
+// Did we push the player onto the history stack in-app (vs. a fresh deep-link load)?
+let playerWasPushed = false;
+// A deep link opened before a profile was chosen; restored once one is selected.
+let pendingRoute = null;
+// Home has been built (profile chosen) — gates history-driven player restores.
+let appReady = false;
+
 // --- PROFILE SYSTEM ---
 const MAX_PROFILES = 5;
 
@@ -248,6 +309,18 @@ function updateProgress(info) {
         store[id] = item;
     }
     persistProgressStore(store);
+
+    // Videasy auto-advances episodes inside the iframe; keep the URL pointed at the
+    // episode actually playing so a refresh resumes the right one (replace, not push).
+    if (item.mediaType === 'tv' && currentlyPlaying && String(currentlyPlaying.id) === id
+        && item.season != null && item.episode != null
+        && playerScreen.classList.contains('active')) {
+        currentlyPlaying.season = item.season;
+        currentlyPlaying.episode = item.episode;
+        if (!isCurrentRoute('tv', id, item.season, item.episode)) {
+            history.replaceState({ player: true }, '', routeUrl('tv', id, item.season, item.episode));
+        }
+    }
 }
 
 // Best-effort parser for VidLink's MEDIA_DATA payload.
@@ -625,6 +698,14 @@ function enterApp() {
     loadPageContent('home');
     heroObserver.observe(heroSection);
     setupSlider(continueWatchingSection.querySelector('.slider'));
+    appReady = true;
+
+    // A deep link opened before a profile was picked — resume it now, over Home.
+    if (pendingRoute) {
+        const r = pendingRoute;
+        pendingRoute = null;
+        restoreFromRoute(r);
+    }
 }
 
 function updateNavProfileAvatar() {
@@ -1448,6 +1529,9 @@ const playHeroTrailerAfterDelay = () => {
     // Skip auto-playing trailers on phones (saves data, avoids blocked autoplay).
     if (isMobile()) return;
     heroTrailerTimeout = setTimeout(async () => {
+        // Don't start a hero trailer if we've since opened the watch screen (e.g. a
+        // deep-link restore builds Home behind the player) — it'd play audio unseen.
+        if (playerScreen.classList.contains('active') || playerSelectScreen.classList.contains('active')) return;
         if (currentHeroItem) {
             const mediaType = currentHeroItem.media_type || (currentHeroItem.title ? 'movie' : 'tv');
             const { results } = await apiFetch(`/${mediaType}/${currentHeroItem.id}/videos`);
@@ -1849,6 +1933,13 @@ const loadMedia = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     generatePlayer(mediaItem, season, episode, startTime);
     showPlayerScreen();
     if (document.getElementById('search-overlay').classList.contains('active')) closeSearchOverlay();
+
+    // Mirror the title into the URL so a refresh or reopened tab resumes here instead
+    // of the profile gate. pushState (not replace) so the browser Back button leaves it.
+    if (!isCurrentRoute(mediaType, currentlyPlaying.id, season, episode)) {
+        history.pushState({ player: true }, '', routeUrl(mediaType, currentlyPlaying.id, season, episode));
+        playerWasPushed = true;
+    }
 };
 
 const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
@@ -1871,6 +1962,76 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     // legacy webkit/moz boolean attributes for older engines.
     playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen webkitallowfullscreen mozallowfullscreen allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *"></iframe>`;
 };
+
+// Re-open the player for a route parsed from the URL (deep link / refresh / Back).
+// The iframe only needs the id, so we start streaming immediately; title art and the
+// Continue Watching card are hydrated from the per-profile progress store when we have
+// it, otherwise from a one-off TMDB lookup.
+async function restoreFromRoute(route) {
+    stopHeroTrailer(); // never leave a home hero trailer playing behind the watch screen
+    const mediaType = route.type;
+    const id = String(route.id);
+    const season = route.season || 1;
+    const episode = route.episode || 1;
+    const saved = getProgressStore()[id];
+    const start = (saved && saved.currentTime) ? saved.currentTime : 0;
+
+    currentlyPlaying = {
+        id, mediaType,
+        title: (saved && saved.title) || '',
+        name: (saved && saved.name) || '',
+        poster_path: (saved && saved.poster_path) || null,
+        backdrop_path: (saved && saved.backdrop_path) || null,
+        season: mediaType === 'tv' ? season : undefined,
+        episode: mediaType === 'tv' ? episode : undefined,
+    };
+
+    generatePlayer({ id, media_type: mediaType }, season, episode, start);
+    showPlayerScreen();
+    playerWasPushed = false; // reached via the URL, not an in-app push
+
+    if (saved) {
+        saveToHistory({ id, title: saved.title, name: saved.name, poster_path: saved.poster_path, backdrop_path: saved.backdrop_path, media_type: mediaType });
+        return;
+    }
+    // Nothing stored locally (different profile / cleared history) — fetch just enough
+    // metadata so the title still shows up properly in history and Continue Watching.
+    try {
+        const details = await apiFetch(`/${mediaType}/${id}`);
+        if (details && details.id) {
+            details.media_type = mediaType;
+            currentlyPlaying.title = details.title || details.name || '';
+            currentlyPlaying.name = details.name || '';
+            currentlyPlaying.poster_path = details.poster_path || null;
+            currentlyPlaying.backdrop_path = details.backdrop_path || null;
+            saveToHistory(details);
+        }
+    } catch (e) { /* offline or bad id — the player still attempts to load */ }
+}
+
+// Leave the watch screen for Home, keeping the URL in sync.
+function exitPlayer() {
+    if (playerWasPushed) {
+        playerWasPushed = false;
+        history.back();               // pop the player entry; popstate shows Home
+    } else {
+        history.replaceState(null, '', BASE_PATH); // fresh deep link — just reset the URL
+        showHomeScreen();
+    }
+}
+
+// Browser Back/Forward (and history.back from exitPlayer) re-syncs screen to the URL.
+function onPopState() {
+    const route = routeFromLocation();
+    if (route && appReady) {
+        if (!playerScreen.classList.contains('active')) restoreFromRoute(route);
+    } else {
+        playerWasPushed = false;
+        if (playerScreen.classList.contains('active') || playerSelectScreen.classList.contains('active')) {
+            showHomeScreen();
+        }
+    }
+}
 
 
 // --- Player Selection Screen ---
@@ -2041,7 +2202,7 @@ function goToPage(page) {
 
 
 // --- Event Listeners ---
-backToHomeBtn.addEventListener('click', showHomeScreen);
+backToHomeBtn.addEventListener('click', exitPlayer);
 searchInput.addEventListener('input', handleSearch);
 heroMuteBtn.addEventListener('click', toggleHeroMute);
 homeScreen.addEventListener('scroll', () => mainNav.classList.toggle('scrolled', homeScreen.scrollTop > 10));
@@ -2231,7 +2392,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (searchOverlay.classList.contains('active')) { closeSearchOverlay(); return; }
     if (detailsModal.classList.contains('active')) { closeDetailsModal(); return; }
-    if (playerScreen.classList.contains('active')) { showHomeScreen(); return; }
+    if (playerScreen.classList.contains('active')) { exitPlayer(); return; }
 });
 
 
@@ -2254,6 +2415,22 @@ const rowObserver = new IntersectionObserver((entries, observer) => {
 
 document.addEventListener('DOMContentLoaded', () => {
     initProfiles();
-    renderProfileScreen();
-    showScreen(profileScreen);
+    normalizeRedirectedUrl();
+    window.addEventListener('popstate', onPopState);
+
+    const route = routeFromLocation();
+    if (route && getActiveProfileId()) {
+        // Deep link + a profile is already active → skip "Who's watching" and resume
+        // straight into the player (Home is built underneath so Back works).
+        pendingRoute = route;
+        enterApp();
+    } else if (route) {
+        // Deep link but no profile chosen yet → gate on profile, then resume.
+        pendingRoute = route;
+        renderProfileScreen();
+        showScreen(profileScreen);
+    } else {
+        renderProfileScreen();
+        showScreen(profileScreen);
+    }
 });

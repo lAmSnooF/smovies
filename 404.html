@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SFLIX</title>
+    <script>
+        // GitHub Pages serves this file for any path it doesn't have a file for — e.g. a
+        // deep link like /smovies/tv/1399/1/1 opened directly or via refresh. We can't
+        // serve the SPA from that path, so stash the route in the query string and bounce
+        // to the app root (/smovies/). index.html's head script rewrites it back to the
+        // real path, and script.js resumes the player. (spa-github-pages technique.)
+        //
+        // pathSegmentsToKeep = 1 keeps the repo folder ("smovies") as the app root. If this
+        // ever moves to a user/root Pages site served at "/", set it to 0.
+        (function () {
+            var pathSegmentsToKeep = 1;
+            var l = window.location;
+            l.replace(
+                l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+                l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+                l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+                (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+                l.hash
+            );
+        }());
+    </script>
+</head>
+<body></body>
+</html>
