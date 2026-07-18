@@ -153,8 +153,6 @@ function isCurrentRoute(mediaType, id, season, episode) {
     return strip(location.pathname) === strip(routeUrl(mediaType, id, season, episode));
 }
 
-// Did we push the player onto the history stack in-app (vs. a fresh deep-link load)?
-let playerWasPushed = false;
 // A deep link opened before a profile was chosen; restored once one is selected.
 let pendingRoute = null;
 // Home has been built (profile chosen) — gates history-driven player restores.
@@ -1969,7 +1967,6 @@ const loadMedia = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     // of the profile gate. pushState (not replace) so the browser Back button leaves it.
     if (!isCurrentRoute(mediaType, currentlyPlaying.id, season, episode)) {
         history.pushState({ player: true }, '', routeUrl(mediaType, currentlyPlaying.id, season, episode));
-        playerWasPushed = true;
     }
 };
 
@@ -2034,6 +2031,7 @@ async function openEpisodeSelect() {
     seasonSel.onchange = () => loadPlayerEpisodes(cp.id, seasonSel.value);
 
     showScreen(episodeSelectScreen);
+    episodeSelectScreen.scrollTop = 0; // always open at the top (screens persist scroll)
     loadPlayerEpisodes(cp.id, seasonSel.value);
 }
 
@@ -2105,7 +2103,6 @@ async function restoreFromRoute(route) {
 
     generatePlayer({ id, media_type: mediaType }, season, episode, start);
     showPlayerScreen();
-    playerWasPushed = false; // reached via the URL, not an in-app push
 
     if (saved) {
         saveToHistory({ id, title: saved.title, name: saved.name, poster_path: saved.poster_path, backdrop_path: saved.backdrop_path, media_type: mediaType });
@@ -2126,28 +2123,23 @@ async function restoreFromRoute(route) {
     } catch (e) { /* offline or bad id — the player still attempts to load */ }
 }
 
-// Leave the watch screen for Home, keeping the URL in sync.
+// Leave the watch screen for Home, keeping the URL in sync. We deliberately DON'T use
+// history.back(): in-iframe players (notably Peachify) push a browser history entry for
+// every episode you open inside them, so stepping back would replay those episodes one
+// at a time instead of leaving. Pushing Home lands there in a single Back press.
 function exitPlayer() {
-    if (playerWasPushed) {
-        playerWasPushed = false;
-        history.back();               // pop the player entry; popstate shows Home
-    } else {
-        history.replaceState(null, '', BASE_PATH); // fresh deep link — just reset the URL
-        showHomeScreen();
-    }
+    if (routeFromLocation()) history.pushState(null, '', BASE_PATH);
+    showHomeScreen();
 }
 
-// Browser Back/Forward (and history.back from exitPlayer) re-syncs screen to the URL.
+// Browser Back/Forward re-syncs the visible screen to the URL.
 function onPopState() {
     const route = routeFromLocation();
     if (route && appReady) {
         if (!playerScreen.classList.contains('active')) restoreFromRoute(route);
-    } else {
-        playerWasPushed = false;
-        if (playerScreen.classList.contains('active') || playerSelectScreen.classList.contains('active')
+    } else if (playerScreen.classList.contains('active') || playerSelectScreen.classList.contains('active')
             || episodeSelectScreen.classList.contains('active')) {
-            showHomeScreen();
-        }
+        showHomeScreen();
     }
 }
 
@@ -2191,6 +2183,7 @@ function openPlayerSelect(from) {
     playerAtOpen = getSelectedPlayer();
     renderPlayerSelectScreen();
     showScreen(playerSelectScreen);
+    playerSelectScreen.scrollTop = 0; // always open at the top (screens persist scroll)
 }
 
 function closePlayerSelect() {
