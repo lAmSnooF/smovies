@@ -20,7 +20,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 
@@ -251,10 +251,16 @@
 
     <div id="player-screen" class="screen">
         <button id="back-to-home-btn">&larr; Back</button>
-        <button id="switch-player-btn" title="Change player">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM10 8v8l5-4z"></path></svg>
-            <span>Player</span>
-        </button>
+        <div class="player-top-actions">
+            <button id="episodes-btn" title="Episodes" style="display:none;">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h13v2H4zm0 4h13v2H4zm0 4h9v2H4zm15-4l5 3-5 3z"></path></svg>
+                <span>Episodes</span>
+            </button>
+            <button id="switch-player-btn" title="Change player">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM10 8v8l5-4z"></path></svg>
+                <span>Player</span>
+            </button>
+        </div>
         <div id="player-preview"></div>
     </div>
 
@@ -265,6 +271,18 @@
             <h1 class="player-select-title">Choose Player</h1>
             <p class="player-select-subtitle">Select the source used to stream. Videasy is the default and works best &mdash; try another source if a title is missing or won't load.</p>
             <div id="player-select-list" class="player-select-list"></div>
+        </div>
+    </div>
+
+    <!-- ===== EPISODE SELECTION SCREEN (for players without a built-in selector) ===== -->
+    <div id="episode-select-screen" class="screen">
+        <div class="player-select-container">
+            <button id="episode-select-back" class="player-select-back">&larr; Back</button>
+            <div class="episodes-header">
+                <h2 id="episode-select-title">Episodes</h2>
+                <select id="player-season-selector"></select>
+            </div>
+            <ul id="player-episode-list"></ul>
         </div>
     </div>
 
@@ -328,6 +346,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=22"></script>
+    <script src="script.js?v=23"></script>
 </body>
 </html>

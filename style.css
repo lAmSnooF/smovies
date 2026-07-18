@@ -1739,7 +1739,7 @@ nav .search-container:focus-within > svg { color: #fff; }
     margin: 0;
     font-size: 1.6em;
 }
-#season-selector {
+#season-selector, #player-season-selector {
     background-color: rgba(30,30,30,0.8);
     border: 1px solid #777;
     color: #fff;
@@ -1748,7 +1748,7 @@ nav .search-container:focus-within > svg { color: #fff; }
     font-size: 1em;
     max-width: 60%;
 }
-#episode-list {
+#episode-list, #player-episode-list {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -1764,6 +1764,9 @@ nav .search-container:focus-within > svg { color: #fff; }
     transition: background-color 0.2s;
 }
 .episode-item:hover { background-color: #2a2a2a; }
+/* The episode currently playing, highlighted in the watch-screen episode picker. */
+.episode-item.playing { background-color: rgba(229, 9, 20, 0.18); }
+.episode-item.playing .episode-number { color: var(--accent, #e50914); }
 .episode-item:hover .episode-thumbnail-container .play-icon-overlay { opacity: 1; }
 .episode-number {
     font-size: 1.5em;
@@ -1917,12 +1920,17 @@ nav .search-container:focus-within > svg { color: #fff; }
 }
 #back-to-home-btn:hover { background-color: rgba(60, 60, 60, 0.75); border-color: rgba(255,255,255,0.35); transform: translateX(-2px); }
 
-/* "Player" (change source) button on the watch screen — mirrors Back on the right. */
-#switch-player-btn {
+/* "Episodes" + "Player" buttons on the watch screen — mirror Back, grouped on the right. */
+.player-top-actions {
     position: absolute;
     top: calc(20px + var(--safe-top));
     right: calc(20px + env(safe-area-inset-right, 0px));
     z-index: 1001;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#switch-player-btn, #episodes-btn {
     display: flex;
     align-items: center;
     gap: 7px;
@@ -1938,8 +1946,8 @@ nav .search-container:focus-within > svg { color: #fff; }
     cursor: pointer;
     transition: background-color 0.25s ease, transform 0.15s ease, border-color 0.25s ease;
 }
-#switch-player-btn svg { width: 18px; height: 18px; }
-#switch-player-btn:hover { background-color: rgba(60, 60, 60, 0.75); border-color: rgba(255,255,255,0.35); transform: translateX(2px); }
+#switch-player-btn svg, #episodes-btn svg { width: 18px; height: 18px; }
+#switch-player-btn:hover, #episodes-btn:hover { background-color: rgba(60, 60, 60, 0.75); border-color: rgba(255,255,255,0.35); transform: translateY(-1px); }
 
 /* ===== PLAYER SELECTION SCREEN ===== */
 #player-select-screen {
@@ -2029,9 +2037,8 @@ nav .search-container:focus-within > svg { color: #fff; }
 @media (max-width: 740px) {
     .player-select-container { padding: calc(64px + var(--safe-top)) 18px 48px; }
     .player-select-title { font-size: 1.6em; }
-    #switch-player-btn { padding: 9px 15px; font-size: 0.9em; }
-    #switch-player-btn span { display: none; }
-    #switch-player-btn { gap: 0; }
+    #switch-player-btn, #episodes-btn { padding: 9px 15px; font-size: 0.9em; gap: 0; }
+    #switch-player-btn span, #episodes-btn span { display: none; }
 }
 
 /* ===== MOBILE BOTTOM NAV ===== */

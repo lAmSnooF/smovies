@@ -401,6 +401,8 @@ const homeScreen = document.getElementById('home-screen');
 const playerScreen = document.getElementById('player-screen');
 const playerPreview = document.getElementById('player-preview');
 const backToHomeBtn = document.getElementById('back-to-home-btn');
+const episodesBtn = document.getElementById('episodes-btn');
+const episodeSelectScreen = document.getElementById('episode-select-screen');
 const searchInput = document.getElementById('search-input');
 const searchResultsList = document.getElementById('search-results-list');
 const mainNav = document.getElementById('main-nav');
@@ -1868,6 +1870,7 @@ const PLAYERS = {
         description: 'Recommended. Clean player with an episode selector, autoplay-next and resume where you left off.',
         recommended: true,
         origin: 'https://player.videasy.to',
+        hasEpisodeSelector: true, // built-in via the episodeSelector=true param below
         // Embed player.videasy.TO directly: player.videasy.NET 301-redirects to it, so using
         // .net makes every Play pay an extra DNS+TLS+round-trip for the redirect (~4x slower
         // initial load). If .to ever stops resolving, revert this to .net.
@@ -1890,6 +1893,7 @@ const PLAYERS = {
         name: 'Peachify',
         description: 'Second pick. Modern player with multiple servers, an in-player episode browser and resume support.',
         origin: 'https://peachify.pro',
+        hasEpisodeSelector: true, // built-in Episodes browser inside its settings menu
         // Peachify takes a TMDB id directly. accent tints the UI to our red; startAt
         // resumes from saved progress; autoNext enables episode auto-advance (it uses
         // credits timing when available, else a ~30s fallback). Progress comes back via
@@ -1988,7 +1992,93 @@ const generatePlayer = (mediaItem, season = 1, episode = 1, startTime = 0) => {
     // whole frame chain so the actual video element can enter fullscreen. We also add the
     // legacy webkit/moz boolean attributes for older engines.
     playerPreview.innerHTML = `<iframe src="${embedUrl}" allowfullscreen webkitallowfullscreen mozallowfullscreen allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *"></iframe>`;
+    updateEpisodesButton();
 };
+
+// Show the in-app "Episodes" button only when watching a TV show on a player that has
+// no episode selector of its own (e.g. VidSrc). Videasy and Peachify have built-in ones.
+function updateEpisodesButton() {
+    const player = PLAYERS[getSelectedPlayer()] || PLAYERS.videasy;
+    const isTv = currentlyPlaying && currentlyPlaying.mediaType === 'tv';
+    episodesBtn.style.display = (isTv && !player.hasEpisodeSelector) ? 'flex' : 'none';
+}
+
+// Episode picker for players without a built-in selector. Reuses the season/episode
+// data we already fetch for the details modal; picking an episode re-embeds the player.
+async function openEpisodeSelect() {
+    const cp = currentlyPlaying;
+    if (!cp || cp.mediaType !== 'tv') return;
+
+    let details = detailsCache.get(Number(cp.id)) || detailsCache.get(cp.id);
+    if (!details || !details.seasons) {
+        details = await apiFetch(`/tv/${cp.id}`);
+        if (details && details.id) { details.media_type = 'tv'; detailsCache.set(details.id, details); }
+    }
+
+    const titleEl = document.getElementById('episode-select-title');
+    titleEl.textContent = (details && (details.name || details.title)) || cp.name || cp.title || 'Episodes';
+
+    const seasonSel = document.getElementById('player-season-selector');
+    seasonSel.innerHTML = '';
+    (details && details.seasons || []).forEach(s => {
+        if (s.season_number > 0 && s.episode_count > 0) {
+            const opt = document.createElement('option');
+            opt.value = s.season_number;
+            opt.textContent = `Season ${s.season_number}`;
+            seasonSel.appendChild(opt);
+        }
+    });
+    if (seasonSel.options.length === 0) return; // no browsable seasons
+    seasonSel.value = String(cp.season || 1);
+    if (!seasonSel.value) seasonSel.selectedIndex = 0;
+    seasonSel.onchange = () => loadPlayerEpisodes(cp.id, seasonSel.value);
+
+    showScreen(episodeSelectScreen);
+    loadPlayerEpisodes(cp.id, seasonSel.value);
+}
+
+async function loadPlayerEpisodes(tvId, seasonNumber) {
+    const list = document.getElementById('player-episode-list');
+    list.innerHTML = '';
+    const seasonDetails = await apiFetch(`/tv/${tvId}/season/${seasonNumber}`);
+    if (!seasonDetails || !seasonDetails.episodes) return;
+
+    const cp = currentlyPlaying;
+    seasonDetails.episodes.forEach(ep => {
+        const li = document.createElement('li');
+        li.className = 'episode-item';
+        const isPlaying = cp && String(cp.id) === String(tvId)
+            && Number(cp.season) === Number(seasonNumber) && Number(cp.episode) === ep.episode_number;
+        if (isPlaying) li.classList.add('playing');
+        const overview = ep.overview ? ep.overview.substring(0, 200) + (ep.overview.length > 200 ? '...' : '') : 'No overview available.';
+        li.innerHTML = `
+            <span class="episode-number">${ep.episode_number}</span>
+            <div class="episode-thumbnail-container">
+                <img class="episode-thumbnail" src="${ep.still_path ? IMAGE_BASE_URL + 'w300' + ep.still_path : ''}" alt="Episode ${ep.episode_number}">
+                <div class="play-icon-overlay">
+                    <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"></path></svg>
+                </div>
+            </div>
+            <div class="episode-details">
+                <div class="episode-title-bar">
+                    <h3></h3>
+                    <span class="episode-runtime">${ep.runtime ? ep.runtime + 'm' : ''}</span>
+                </div>
+                <p></p>
+            </div>`;
+        li.querySelector('h3').textContent = ep.name || `Episode ${ep.episode_number}`;
+        li.querySelector('.episode-details p').textContent = overview;
+        li.onclick = () => {
+            const show = {
+                id: tvId, media_type: 'tv',
+                name: cp && cp.name, title: cp && cp.title,
+                poster_path: cp && cp.poster_path, backdrop_path: cp && cp.backdrop_path,
+            };
+            loadMedia(show, Number(seasonNumber), ep.episode_number);
+        };
+        list.appendChild(li);
+    });
+}
 
 // Re-open the player for a route parsed from the URL (deep link / refresh / Back).
 // The iframe only needs the id, so we start streaming immediately; title art and the
@@ -2054,7 +2144,8 @@ function onPopState() {
         if (!playerScreen.classList.contains('active')) restoreFromRoute(route);
     } else {
         playerWasPushed = false;
-        if (playerScreen.classList.contains('active') || playerSelectScreen.classList.contains('active')) {
+        if (playerScreen.classList.contains('active') || playerSelectScreen.classList.contains('active')
+            || episodeSelectScreen.classList.contains('active')) {
             showHomeScreen();
         }
     }
@@ -2392,6 +2483,10 @@ document.getElementById('nav-choose-player').addEventListener('click', (e) => {
 document.getElementById('switch-player-btn').addEventListener('click', () => openPlayerSelect('player'));
 document.getElementById('player-select-back').addEventListener('click', closePlayerSelect);
 
+// Episode selection screen: opened from the watch screen ("Episodes" button), back to it.
+episodesBtn.addEventListener('click', openEpisodeSelect);
+document.getElementById('episode-select-back').addEventListener('click', () => showScreen(playerScreen));
+
 // Combined click-outside logic
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.profile-menu-container')) {
@@ -2419,6 +2514,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (searchOverlay.classList.contains('active')) { closeSearchOverlay(); return; }
     if (detailsModal.classList.contains('active')) { closeDetailsModal(); return; }
+    if (episodeSelectScreen.classList.contains('active')) { showScreen(playerScreen); return; }
     if (playerScreen.classList.contains('active')) { exitPlayer(); return; }
 });
 
