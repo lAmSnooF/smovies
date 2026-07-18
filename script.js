@@ -323,12 +323,16 @@ function updateProgress(info) {
     }
 }
 
-// Best-effort parser for VidLink's MEDIA_DATA payload.
+// Best-effort parser for the VidLink / Peachify MEDIA_DATA payload (a map of titles
+// keyed by id, each with a { progress: { watched, duration } } object).
 function handleVidlinkData(data) {
     try {
         const entries = Object.values(data);
         if (!entries.length) return;
-        const e = entries[0];
+        // The payload can hold the whole continue-watching store, not just the current
+        // title — prefer the entry that matches what's playing, else fall back to first.
+        const cur = currentlyPlaying && currentlyPlaying.id;
+        const e = (cur && entries.find(x => String(x.id) === String(cur))) || entries[0];
         const watched = e.progress ? e.progress.watched : 0;
         const duration = e.progress ? e.progress.duration : 0;
         updateProgress({
@@ -342,7 +346,8 @@ function handleVidlinkData(data) {
     } catch (err) { /* ignore */ }
 }
 
-// Unified message listener — handles Videasy, VidKing and VidLink progress events.
+// Unified message listener — handles Videasy, VidKing/Peachify (PLAYER_EVENT) and
+// VidLink/Peachify (MEDIA_DATA) progress events.
 window.addEventListener('message', (event) => {
     let payload = event.data;
     if (typeof payload === 'string') {
@@ -356,11 +361,11 @@ window.addEventListener('message', (event) => {
             handleVidlinkData(payload.data);
             return;
         }
-        // VidKing
+        // VidKing / Peachify (Peachify sends the id as `tmdbId`)
         if (payload.type === 'PLAYER_EVENT' && payload.data) {
             const d = payload.data;
             updateProgress({
-                id: d.id != null ? d.id : (currentlyPlaying && currentlyPlaying.id),
+                id: d.id != null ? d.id : (d.tmdbId != null ? d.tmdbId : (currentlyPlaying && currentlyPlaying.id)),
                 mediaType: d.mediaType || (currentlyPlaying && currentlyPlaying.mediaType) || 'movie',
                 currentTime: num(d.currentTime),
                 duration: num(d.duration),
@@ -1746,7 +1751,7 @@ const openDetailsModal = async (item) => {
     // Silence the hero trailer so it and the modal's trailer don't play over each other.
     muteHeroTrailer();
     // The user is looking at a title — warm the player connection so Play loads fast.
-    warmVideasyConnection();
+    warmPlayerConnection();
 
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
     const details = await apiFetch(`/${mediaType}/${item.id}`, `&append_to_response=credits,videos,content_ratings,recommendations,keywords,images&include_image_language=en,null`);
@@ -1862,6 +1867,7 @@ const PLAYERS = {
         name: 'Videasy',
         description: 'Recommended. Clean player with an episode selector, autoplay-next and resume where you left off.',
         recommended: true,
+        origin: 'https://player.videasy.to',
         // Embed player.videasy.TO directly: player.videasy.NET 301-redirects to it, so using
         // .net makes every Play pay an extra DNS+TLS+round-trip for the redirect (~4x slower
         // initial load). If .to ever stops resolving, revert this to .net.
@@ -1879,10 +1885,29 @@ const PLAYERS = {
             return `${base}${path}?${params.toString()}`;
         }
     },
+    peachify: {
+        id: 'peachify',
+        name: 'Peachify',
+        description: 'Second pick. Modern player with multiple servers, an in-player episode browser and resume support.',
+        origin: 'https://peachify.pro',
+        // Peachify takes a TMDB id directly. accent tints the UI to our red; startAt
+        // resumes from saved progress; autoNext enables episode auto-advance (it uses
+        // credits timing when available, else a ~30s fallback). Progress comes back via
+        // the shared MEDIA_DATA / PLAYER_EVENT message listener above.
+        build: ({ mediaType, tmdbId, season, episode, start }) => {
+            const base = 'https://peachify.pro/embed/';
+            const path = mediaType === 'movie' ? `movie/${tmdbId}` : `tv/${tmdbId}/${season}/${episode}`;
+            const params = new URLSearchParams({ accent: ACCENT_HEX });
+            if (mediaType === 'tv') params.set('autoNext', 'true');
+            if (start > 0) params.set('startAt', Math.floor(start));
+            return `${base}${path}?${params.toString()}`;
+        }
+    },
     vidsrc: {
         id: 'vidsrc',
         name: 'VidSrc',
-        description: "Alternate source. Try this if a title is missing from Videasy or won't load.",
+        description: "Last resort. Try this if a title is missing from the others or won't load.",
+        origin: 'https://vidsrc-embed.ru',
         // VidSrc takes a TMDB id directly (same ids we use everywhere else).
         build: ({ mediaType, tmdbId, season, episode }) => {
             const base = 'https://vidsrc-embed.ru/embed/';
@@ -1900,16 +1925,18 @@ const setSelectedPlayer = (id) => {
     if (PLAYERS[id]) localStorage.setItem('smovies_player', id);
 };
 
-// Re-open a warm TCP/TLS connection to the Videasy origin right before the user is likely
-// to hit Play (browsers drop idle preconnects after ~10s), so the player iframe starts
-// loading without a cold DNS+TLS handshake. Called when a details modal opens.
-function warmVideasyConnection() {
-    const prev = document.getElementById('videasy-warm');
+// Re-open a warm TCP/TLS connection to the selected player's origin right before the user
+// is likely to hit Play (browsers drop idle preconnects after ~10s), so the player iframe
+// starts loading without a cold DNS+TLS handshake. Called when a details modal opens.
+function warmPlayerConnection() {
+    const prev = document.getElementById('player-warm');
     if (prev) prev.remove();
+    const player = PLAYERS[getSelectedPlayer()] || PLAYERS.videasy;
+    if (!player.origin) return;
     const link = document.createElement('link');
-    link.id = 'videasy-warm';
+    link.id = 'player-warm';
     link.rel = 'preconnect';
-    link.href = 'https://player.videasy.to';
+    link.href = player.origin;
     document.head.appendChild(link);
 }
 
